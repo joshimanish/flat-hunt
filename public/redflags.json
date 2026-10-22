@@ -1,0 +1,92 @@
+[
+  {
+    "id": "deposit-before-viewing",
+    "default": true,
+    "test": "\\b(kaution|anzahlung|vorauszahlung|reservierungsgebühr|bearbeitungsgebühr|gebühr)\\b.{0,60}\\b(vor|bevor)\\b.{0,15}\\bbesichtigung\\w*|\\b(vor|bevor)\\b.{0,15}\\bbesichtigung\\w*.{0,60}((\\bzahlen\\b|\\bbezahl\\w*|überweis\\w*|\\banzahlung\\b)|\\bkaution\\b|reservierungsgebühr)|(\\bzahlen\\b|\\bbezahl\\w*|überweis\\w*|\\banzahlung\\b).{0,40}\\b(vor|bevor)\\b.{0,15}\\bbesichtigung\\w*|\\b(deposit|fee|pay|payment|transfer)\\b.{0,60}\\b(before|prior to)\\b.{0,15}\\b(viewing|visit|inspection)\\b|\\b(before|prior to)\\b.{0,15}\\b(viewing|visit|inspection)\\b.{0,60}\\b(pay|deposit|transfer|fee)\\b|(caução|depósito|\\bsinal\\b|pagamento|\\bpagar\\b|transferir).{0,60}\\bantes d[aeo]s?\\b.{0,15}\\bvisita",
+    "label": {
+      "en": "Deposit or fees before a viewing",
+      "de": "Kaution oder Gebühren vor der Besichtigung",
+      "pt": "Caução ou taxas antes da visita"
+    },
+    "reason": {
+      "en": "Honest landlords take the deposit after the contract is signed, never before you have seen the flat.",
+      "de": "Seriöse Vermieter verlangen die Kaution erst nach Vertragsschluss, nie bevor du die Wohnung gesehen hast.",
+      "pt": "Senhorios honestos só pedem a caução depois de assinado o contrato, nunca antes de ver o apartamento."
+    }
+  },
+  {
+    "id": "owner-abroad",
+    "default": true,
+    "test": "\\bim ausland\\b|\\babroad\\b|\\boverseas\\b|no estrangeiro|schlüssel.{0,50}(per post|mit der post|zugeschickt|zuschicken|schicke|versand|versenden|kurier|dhl)|keys?.{0,50}(by (post|mail)|courier|shipped|posted to you|sent to you|will be sent)|chaves?.{0,50}(pelo correio|por correio|enviad)",
+    "label": {
+      "en": "Owner abroad, keys by post",
+      "de": "Vermieter im Ausland, Schlüssel per Post",
+      "pt": "Proprietário no estrangeiro, chaves pelo correio"
+    },
+    "reason": {
+      "en": "A classic scam: the \"owner\" cannot show the flat and wants money before sending keys that never arrive.",
+      "de": "Eine klassische Masche: Der angebliche Vermieter kann die Wohnung nicht zeigen und will Geld, bevor er Schlüssel schickt, die nie ankommen.",
+      "pt": "Um golpe clássico: o \"proprietário\" não pode mostrar o apartamento e quer dinheiro antes de enviar chaves que nunca chegam."
+    }
+  },
+  {
+    "id": "underpriced",
+    "default": true,
+    "computed": "underpriced",
+    "label": {
+      "en": "Far below the usual price",
+      "de": "Weit unter dem üblichen Preis",
+      "pt": "Muito abaixo do preço habitual"
+    },
+    "reason": {
+      "en": "The price per m² is below 60 % of the median of your tracked listings in the same city. Bait offers are often too cheap to be true.",
+      "de": "Der Preis pro m² liegt unter 60 % des Medians deiner erfassten Angebote in derselben Stadt. Lockangebote sind oft zu billig, um wahr zu sein.",
+      "pt": "O preço por m² está abaixo de 60 % da mediana dos anúncios guardados na mesma cidade. Ofertas-isco costumam ser baratas demais para ser verdade."
+    }
+  },
+  {
+    "id": "odd-payment",
+    "default": true,
+    "test": "(\\bzahl(en|ung)\\w*|\\bbezahl\\w*|\\bpay(s|ing|ment)?\\b|\\bpag(ar|amento)\\b).{0,40}(gutschein\\w*|geschenkkarte\\w*|\\bgift ?cards?\\b|\\bvouchers?\\b|itunes|google play|\\bsteam\\b|paysafe\\w*|cart(ão|ões)[ -]presente)|(gutschein\\w*|geschenkkarte\\w*|\\bgift ?cards?\\b|\\bvouchers?\\b|itunes|google play|\\bsteam\\b|paysafe\\w*|cart(ão|ões)[ -]presente).{0,40}(\\bzahl(en|ung)\\w*|\\bbezahl\\w*|\\bpay(s|ing|ment)?\\b|\\bpag(ar|amento)\\b)|\\bcrypto\\w*|\\bkrypto\\w*|\\bbitcoin\\w*|\\bbtc\\b|\\busdt\\b|\\bethereum\\b|western union|moneygram",
+    "label": {
+      "en": "Payment by gift card, crypto or money transfer service",
+      "de": "Zahlung per Gutschein, Krypto oder Bargeldtransfer",
+      "pt": "Pagamento com cartão-presente, cripto ou serviço de transferência"
+    },
+    "reason": {
+      "en": "Gift cards, crypto and cash transfer services cannot be reversed or traced; landlords do not need them.",
+      "de": "Gutscheine, Kryptowährung und Bargeldtransfers lassen sich weder zurückholen noch nachverfolgen; Vermieter brauchen sie nicht.",
+      "pt": "Cartões-presente, cripto e transferências de dinheiro não podem ser revertidos nem rastreados; senhorios não precisam deles."
+    }
+  },
+  {
+    "id": "id-before-contact",
+    "default": true,
+    "test": "(ausweis|reisepass|\\bpassport\\b|\\bid card\\b|\\bid copy\\b|\\bcopy of your id\\b|identity card|documento de identidade|cartão de cidadão|passaporte).{0,80}\\b(vor|bevor|before|antes d[aeo]s?)\\b.{0,25}\\b(kontakt\\w*|besichtigung\\w*|gespräch|treffen|contact\\w*|viewing|visit\\w*|meet\\w*|talk|speak|call|visita|contacto)\\b|\\b(vor|bevor|before|antes d[aeo]s?)\\b.{0,25}\\b(kontakt\\w*|besichtigung\\w*|gespräch|treffen|contact\\w*|viewing|visit\\w*|meet\\w*|talk|speak|call|visita|contacto)\\b.{0,80}(ausweis|reisepass|\\bpassport\\b|\\bid card\\b|\\bid copy\\b|\\bcopy of your id\\b|identity card|documento de identidade|cartão de cidadão|passaporte)|\\b(zuerst|first|primeiro)\\b.{0,40}(kopie|\\bcopy\\b|\\bscan\\b|\\bfoto\\b|\\bphoto\\b|cópia).{0,30}(ausweis|reisepass|\\bpassport\\b|\\bid card\\b|\\bid copy\\b|\\bcopy of your id\\b|identity card|documento de identidade|cartão de cidadão|passaporte)|\\b(send|senden|schicken|envie)\\b.{0,40}(ausweis|reisepass|\\bpassport\\b|\\bid card\\b|\\bid copy\\b|\\bcopy of your id\\b|identity card|documento de identidade|cartão de cidadão|passaporte).{0,30}\\b(first|zuerst|primeiro)\\b",
+    "label": {
+      "en": "ID copy requested before any contact",
+      "de": "Ausweiskopie vor jedem Kontakt verlangt",
+      "pt": "Cópia do documento pedida antes de qualquer contacto"
+    },
+    "reason": {
+      "en": "An ID copy sent to a stranger can be used for identity theft. Share it only after a viewing, ideally watermarked.",
+      "de": "Eine Ausweiskopie an Unbekannte kann für Identitätsdiebstahl genutzt werden. Gib sie erst nach einer Besichtigung heraus, am besten mit Wasserzeichen.",
+      "pt": "Uma cópia do documento enviada a um desconhecido pode servir para roubo de identidade. Partilhe-a só depois de uma visita, de preferência com marca de água."
+    }
+  },
+  {
+    "id": "viewing-fee",
+    "default": true,
+    "test": "besichtigungsgebühr|besichtigung nur gegen (eine )?(gebühr|bezahlung|zahlung|entgelt)|gebühr für (die )?besichtigung|viewing fee|fee for (the |a )?viewing|pay(ment)? (for|to book) (the |a )?viewing|taxa de visita|visita paga",
+    "label": {
+      "en": "Fee for a viewing",
+      "de": "Besichtigung nur gegen Gebühr",
+      "pt": "Taxa para visitar"
+    },
+    "reason": {
+      "en": "Charging for a viewing is not normal in Germany and is a common way to collect money for flats that do not exist.",
+      "de": "Gebühren für Besichtigungen sind in Deutschland nicht üblich und eine verbreitete Masche, um Geld für Wohnungen zu kassieren, die es nicht gibt.",
+      "pt": "Cobrar por uma visita não é normal na Alemanha e é uma forma comum de recolher dinheiro por apartamentos que não existem."
+    }
+  }
+]

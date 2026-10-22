@@ -1,0 +1,1453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flat Hunt</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Layout: filters on the left rail, decision panels (map + chart + KPIs) up top, ranked list below. */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --surface-2: #f0f2f5; --surface-3: #e4e8ee; --fg: #0f172a; --muted: #64748b; --line: #e2e6ec;
+  --accent: #1f4e9a; --accent-fg: #ffffff;
+  --good: #1d7a4b; --good-bg: #e2f3ea; --warn: #a86a0c; --warn-bg: #fbefd6; --bad: #b4393b; --bad-bg: #f9e3e3; --info: #2c5fb8; --info-bg: #e4ecfa;
+  --display: "Inter Tight", "Inter", system-ui, sans-serif; --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; --radius: 12px; --shadow: 0 1px 2px rgba(16, 24, 40, .05);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e141b; --surface: #161e28; --surface-2: #1f2934; --surface-3: #2a3643; --fg: #e7ecf2; --muted: #93a1b3; --line: #2b3745;
+  --accent: #6f9ee6; --accent-fg: #0e141b; --good: #52c489; --good-bg: #163427; --warn: #e3ac4e; --warn-bg: #3a2d12; --bad: #e97373; --bad-bg: #3c1c1c; --info: #86aef0; --info-bg: #1b2a44; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e141b; --surface: #161e28; --surface-2: #1f2934; --surface-3: #2a3643; --fg: #e7ecf2; --muted: #93a1b3; --line: #2b3745;
+  --accent: #6f9ee6; --accent-fg: #0e141b; --good: #52c489; --good-bg: #163427; --warn: #e3ac4e; --warn-bg: #3a2d12; --bad: #e97373; --bad-bg: #3c1c1c; --info: #86aef0; --info-bg: #1b2a44; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; padding-block: 0 48px; padding-inline: 16px; }
+.wrap { max-width: 1240px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.015em; }
+a { color: var(--accent); }
+button, select, textarea, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; padding-block: 22px 14px; }
+header.top h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+header.top .sub { color: var(--muted); margin-top: 3px; font-size: 13.5px; }
+.hright { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lang { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.lang button { background: var(--surface); border: 0; padding: 6px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted); white-space: nowrap; }
+.lang button + button { border-left: 1px solid var(--line); }
+.lang button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.newpill { background: var(--good-bg); color: var(--good); font-weight: 700; font-size: 13px; padding: 6px 11px; border-radius: 999px; cursor: pointer; border: 0; }
+
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+aside.filters { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; position: sticky; top: 12px; display: grid; gap: 14px; }
+@media (max-width: 900px) { aside.filters { position: static; } }
+aside h3, .panel h3 { font-size: 12.5px; color: var(--muted); font-weight: 600; margin-bottom: 8px; letter-spacing: 0; }
+.chipset { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .7; }
+.range { display: grid; gap: 4px; font-size: 13px; }
+.range label { display: flex; justify-content: space-between; color: var(--muted); }
+.range label b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.range input { width: 100%; accent-color: var(--accent); }
+.toggles { display: grid; gap: 6px; font-size: 13.5px; }
+.toggles label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.toggles input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.reset { background: none; border: 0; color: var(--accent); font-size: 13px; cursor: pointer; padding: 0; text-align: left; }
+aside select { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; }
+
+.main { display: grid; gap: 16px; min-width: 0; }
+.main > * { min-width: 0; }
+.jumpnav { display: flex; flex-wrap: wrap; gap: 8px; padding: 3px 0; }
+.jumpnav a { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--fg); text-decoration: none; padding: 6px 12px; font-weight: 600; font-size: 12px; }
+.decision { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; }
+.decision-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.decision h2 { font-size: 20px; }.decision p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.decision-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 9px; }
+.decision-item { border: 1px solid var(--line); border-radius: 9px; padding: 11px; display: grid; gap: 5px; background: var(--surface); text-align: left; cursor: pointer; }
+.decision-item:hover, .decision-item:focus-visible { border-color: var(--accent); }
+.decision-item strong { line-height: 1.3; }.decision-item .money { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); }
+.decision-item small { color: var(--muted); }
+.stale { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; background: var(--warn-bg); color: var(--fg); border: 1px solid var(--warn); border-radius: var(--radius); padding: 10px 14px; font-size: 13.5px; }
+.stale strong { color: var(--warn); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; cursor: pointer; text-align: left; }
+.kpi .v { font-family: var(--display); font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi .l { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.kpi .s { font-size: 12.5px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 1000px) { .panels { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; min-width: 0; }
+#map { height: 360px; border-radius: 8px; background: var(--surface-2); }
+.leaflet-container { font: inherit; }
+.placepin { width: 24px; height: 24px; border-radius: 6px; color: #fff; font: 700 12px/20px var(--display); text-align: center; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.leaflet-tooltip.placelabel { font-weight: 600; padding: 2px 6px; }
+.listpin { width: 26px; height: 26px; border-radius: 50%; color: #fff; font: 600 11px/26px var(--display); text-align: center; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: pointer; }
+.listpin.dim { opacity: .4; }
+.chart svg { width: 100%; height: 360px; display: block; }
+.chart text { font-family: var(--body); font-size: 11px; fill: var(--muted); }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .budget { stroke: var(--warn); stroke-dasharray: 4 4; }
+.chart .pt { cursor: pointer; stroke: var(--surface); stroke-width: 1.5; }
+.chart .pt.dim { opacity: .25; }
+.chart .lbl { font-size: 10px; fill: var(--fg); pointer-events: none; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.legend i.sq, .ctable i.sq { border-radius: 3px; }
+.legend i.ring-i { background: none; border: 1.5px dashed #1f4e9a; }
+.chartmode { margin-bottom: 8px; }
+.costs { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: grid; gap: 14px; }
+.costs h2 { font-size: 20px; }
+.costs .intro { margin: 0; color: var(--muted); }
+.cost-inputs, .cost-picks { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.cost-inputs label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.cost-inputs input { width: 105px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.cost-picks button { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); padding: 5px 8px; cursor: pointer; font-size: 12px; }
+.cost-picks button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.cost-rows { display: grid; gap: 12px; }
+.cost-row { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(200px, 2fr) minmax(150px, 180px); gap: 12px; align-items: center; }
+.cost-row strong { display: block; font-size: 13px; }
+.cost-row small { color: var(--muted); }
+.cost-bar { display: flex; width: 100%; height: 24px; overflow: hidden; border-radius: 5px; background: var(--surface-2); }
+.cost-detail { margin-top: 3px; color: var(--muted); font-size: 11px; }
+.cost-bar span { height: 100%; }
+.cost-bar .rent, .cost-key .rent { background: #278778; }.cost-bar .loan, .cost-key .loan { background: #4778c0; }.cost-bar .reserve, .cost-key .reserve { background: #d79736; }
+.cost-barwrap { position: relative; }
+.cost-limit { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 2px dashed var(--bad); }
+.cost-key i.limit { width: 0; height: 12px; border-left: 2px dashed var(--bad); vertical-align: -2px; }
+.cost-total { display: grid; justify-items: end; gap: 3px; }
+.cost-total small { color: var(--muted); font-weight: 500; }
+.cost-total .fact { white-space: normal; text-align: right; font-weight: 500; }
+.cost-row > div:first-child small { display: block; }
+.cost-total { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.cost-key { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; }.cost-key i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; }
+.cost-note { margin: 0; color: var(--muted); font-size: 12px; }
+@media (max-width: 700px) { .cost-row { grid-template-columns: 1fr auto; gap: 5px; }.cost-graph { grid-column: 1 / -1; grid-row: 2; }.cost-total { grid-column: 2; grid-row: 1; } }
+
+.updates { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; }
+.updates ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13.5px; }
+.updates li { display: flex; gap: 10px; align-items: baseline; }
+.updates .d { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 78px; }
+.tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 5px; }
+.tag.new { background: var(--good-bg); color: var(--good); }
+.tag.price { background: var(--info-bg); color: var(--info); }
+.tag.gone { background: var(--bad-bg); color: var(--bad); }
+.tag.sent, .tag.reply, .tag.skipped { background: var(--info-bg); color: var(--info); }
+.tag.back { background: var(--warn-bg); color: var(--warn); }
+.tag.out{background:var(--warn);color:#fff}.tag.flag{background:var(--bad);color:#fff;cursor:help}.crit.flags{border-left-color:var(--bad)}.crit.flags li{margin-bottom:3px}.crit{border-left:3px solid var(--warn);padding:6px 10px;margin:0 0 10px}.crit ul{margin:4px 0 0 18px}
+
+.listhead { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.listhead h2 { font-size: 20px; }
+.listhead .actions { display: flex; gap: 8px; align-items: center; }
+.more { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); padding: 8px 12px; cursor: pointer; font-weight: 600; }
+.cards { display: grid; gap: 8px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.card.is-out { opacity: .55; }
+.card.open { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.row { display: grid; grid-template-columns: 128px 1fr auto; gap: 14px; align-items: center; padding: 10px 12px 10px 10px; cursor: pointer; }
+.row:hover { background: var(--surface-2); }
+.thumbwrap { position: relative; }
+.row .thumb { width: 128px; aspect-ratio: 4/3; object-fit: cover; border-radius: 6px; display: block; background: var(--surface-2); max-width: 100%; }
+.badge-new { position: absolute; top: 6px; left: 6px; }
+.ph { display: grid; place-items: center; color: var(--muted); background: var(--surface-2); border-radius: 6px; aspect-ratio: 4/3; }
+.ph svg { width: 44%; max-width: 72px; height: auto; opacity: .7; }
+.row .thumb.ph { display: grid; }
+.photos .mainimg.ph { display: grid; border-radius: 0; width: 100%; }
+.welcome { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px 24px; display: grid; gap: 10px; justify-items: start; }
+.welcome h2 { font-size: 22px; }
+.welcome p { margin: 0; color: var(--muted); max-width: 60ch; }
+.welcome-actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 6px; }
+.welcome-actions .btn { height: 40px; padding: 0 18px; border-radius: 999px; font-size: 14px; }
+.ring.est .n { font-size: 15px; }
+.rowmain { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; }
+.rowmain h2 { font-size: 16.5px; font-weight: 600; line-height: 1.25; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.rowmain h2 .ctype { font: 500 11.5px/1 var(--body); letter-spacing: 0; padding: 4px 7px; border-radius: 5px; background: var(--info-bg); color: var(--info); }
+.rowmain h2 .ctype.p { background: var(--surface-3); color: var(--muted); }
+.rowmain .line2 { color: var(--muted); font-size: 13px; }
+.rowmain .line2 b { color: var(--fg); font-weight: 600; }
+.facts { display: flex; flex-wrap: wrap; gap: 5px 6px; }
+.fact { font-size: 12.5px; padding: 3px 8px; border-radius: 6px; font-weight: 500; background: var(--surface-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fact.good { background: var(--good-bg); color: var(--good); } .fact.warn { background: var(--warn-bg); color: var(--warn); } .fact.bad { background: var(--bad-bg); color: var(--bad); }
+.fact.unk { background: var(--surface-2); color: var(--muted); white-space: normal; text-align: left; }
+.fact.stale { border: 1px dashed var(--warn); }
+.linkish { border: 0; cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.cost-note .linkish { background: none; color: var(--accent); padding: 0; font-size: 12px; }
+.fact.price { font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+.rowside { display: grid; grid-template-columns: auto auto; gap: 6px 12px; align-items: center; justify-items: end; }
+.ring { width: 56px; height: 56px; position: relative; grid-row: span 2; }
+.ring svg { width: 56px; height: 56px; transform: rotate(-90deg); }
+.ring .bg { fill: none; stroke: var(--surface-3); stroke-width: 5; }
+.ring .fg { fill: none; stroke-width: 5; stroke-linecap: round; }
+.ring .n { position: absolute; inset: 0; display: grid; place-items: center; font: 600 17px var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; background: var(--surface-2); color: var(--fg); }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.s-new { background: var(--surface-2); color: var(--muted); }
+.pill.s-contacted, .pill.s-viewing-done, .pill.s-applied { background: var(--info-bg); color: var(--info); }
+.pill.s-viewing-invited, .pill.s-docs-requested { background: var(--warn-bg); color: var(--warn); }
+.pill.s-accepted { background: var(--good-bg); color: var(--good); }
+.pill.s-rejected, .pill.s-dropped, .pill.s-gone { background: var(--bad-bg); color: var(--bad); }
+.pick { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); }
+.pick input { accent-color: var(--good); width: 15px; height: 15px; margin: 0; }
+.pick.on { border-color: var(--good); color: var(--good); background: var(--good-bg); }
+.compare-toggle { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 5px 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.compare-toggle[aria-pressed="true"] { background: var(--info-bg); color: var(--info); border-color: var(--info); }
+.compare-toggle:disabled { opacity: .45; cursor: not-allowed; }
+.cards { container-type: inline-size; }
+@container (max-width: 720px) { .row { grid-template-columns: 96px 1fr; } .row .thumb { width: 96px; } .rowside { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; min-width: 0; } .rowside > * { max-width: 100%; } .ring { grid-row: auto; } }
+
+.detail { border-top: 1px solid var(--line); }
+.dhead { display: grid; grid-template-columns: 320px 1fr; }
+@media (max-width: 760px) { .dhead { grid-template-columns: 1fr; } }
+.photos .mainimg { aspect-ratio: 4/3; width: 100%; object-fit: cover; display: block; max-width: 100%; }
+.photos .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; background: var(--surface-2); }
+.photos .thumbs img { aspect-ratio: 4/3; width: 100%; object-fit: cover; display: block; cursor: pointer; border-radius: 3px; opacity: .75; max-width: 100%; }
+.photos .thumbs img.on { opacity: 1; outline: 2px solid var(--accent); }
+.dfacts { padding: 14px 18px; display: grid; gap: 12px; min-width: 0; }
+.specs { display: grid; grid-template-columns: 1fr; gap: 0; font-size: 13px; margin: 0; }
+.specs div { display: grid; grid-template-columns: 128px 1fr; gap: 12px; border-bottom: 1px solid var(--line); padding: 6px 0; min-width: 0; }
+.specs div:last-child { border-bottom: 0; }
+.specs dt { color: var(--muted); } .specs dd { margin: 0; font-weight: 500; }
+.travel { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.travel div { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.travel b { display: block; font-family: var(--display); font-size: 18px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.links { display: flex; flex-wrap: wrap; gap: 8px; }
+.links a, .btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); text-decoration: none; cursor: pointer; color: var(--fg); }
+.links a.primary, .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.danger { color: var(--bad); border-color: var(--bad); background: var(--surface); }
+.lactions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); margin-top: 4px; }
+.dfacts h3, .col h3.sp { font-size: 12.5px; color: var(--muted); font-weight: 600; margin: 0 0 6px; letter-spacing: 0; }
+.col h3.sp { margin-top: 14px; }
+.ctable { min-width: 0; font-size: 13px; }
+.ctable th { cursor: default; }
+.ctable td.good { color: var(--good); font-weight: 600; } .ctable td.bad, td.num.bad { color: var(--bad); font-weight: 600; } .ctable td.unk { color: var(--muted); }
+.ctable i.sq { display: inline-block; width: 9px; height: 9px; margin-right: 6px; }
+.hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+.warnline { color: var(--warn); font-size: 12.5px; font-weight: 600; margin: 6px 0 0; }
+.facts.afford { align-items: center; margin-top: 8px; font-size: 13px; }
+.hiddenline { margin: 0 0 4px; color: var(--muted); font-size: 13px; }
+.hiddenline .linkish { background: none; color: var(--accent); padding: 0; font-size: 13px; }
+.fsearch { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.dbody { border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; }
+@media (max-width: 760px) { .dbody { grid-template-columns: 1fr; } }
+.col { padding: 14px 18px; min-width: 0; }
+.col + .col { border-left: 1px solid var(--line); }
+@media (max-width: 760px) { .col + .col { border-left: 0; border-top: 1px solid var(--line); } }
+.col h3 { font-size: 12.5px; color: var(--muted); font-weight: 600; margin-bottom: 8px; letter-spacing: 0; }
+.verdict { font-size: 14.5px; margin: 0 0 10px; }
+.pc { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13.5px; }
+@media (max-width: 500px) { .pc { grid-template-columns: 1fr; } }
+.pc ul { margin: 0; padding-left: 16px; } .pc li { margin-bottom: 3px; }
+.pc .plus { color: var(--good); } .pc .minus { color: var(--bad); }
+.bars { display: grid; grid-template-columns: max-content 1fr max-content; gap: 5px 10px; align-items: center; font-size: 12.5px; margin-top: 12px; }
+.bars .bl { color: var(--muted); } .bars .bt { height: 7px; background: var(--surface-2); border-radius: 4px; overflow: hidden; } .bars .bf { height: 100%; border-radius: 4px; } .bars .bv { font-variant-numeric: tabular-nums; color: var(--muted); }
+details.q summary { cursor: pointer; font-size: 13.5px; color: var(--accent); font-weight: 600; margin-top: 10px; }
+details.q ol { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--muted); }
+.timeline { display: flex; flex-direction: column; gap: 8px; }
+.msg { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13.5px; }
+.msg.in { border-left: 3px solid var(--warn); } .msg.out { border-left: 3px solid var(--line); color: var(--muted); }
+.msg .meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 3px; } .msg .meta b { color: var(--fg); }
+.msg .text { white-space: pre-wrap; }
+.viewings { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 10px; background: var(--surface); }
+.viewings .vw-h { margin: 0; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.vw-item { display: grid; gap: 8px; min-width: 0; } .vw-item + .vw-item { border-top: 1px solid var(--line); padding-top: 10px; }
+.vw-line { margin: 0; font-size: 13.5px; overflow-wrap: anywhere; } .vw-item.declined .vw-line, .vw-item.cancelled .vw-line { color: var(--muted); }
+.vw-times { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px 12px; } .vw-times legend { font-size: 12.5px; color: var(--muted); padding: 0; margin-bottom: 4px; }
+.vw-time { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; min-height: 32px; } .vw-time input { margin: 0; }
+.viewings .vu-btn { height: 36px; padding: 0 14px; font-size: 13.5px; }
+.viewings .err { color: var(--bad); font-size: 13px; margin: 0; } .viewings .err:empty { display: none; }
+.msg .meta .tag.mtag { margin-left: 4px; font-size: 11px; background: var(--surface-2); color: var(--muted); } .msg .meta .tag.mtag.back { background: var(--warn-bg); color: var(--warn); }
+.msg .meta > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.empty { color: var(--muted); font-size: 13.5px; font-style: italic; }
+.controls { display: grid; gap: 8px; margin-top: 12px; }
+.controls label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; margin-bottom: 3px; }
+.controls select, .controls textarea, .controls input { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; }
+.controls textarea { min-height: 64px; resize: vertical; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } @media (max-width: 500px) { .row2 { grid-template-columns: 1fr; } }
+.addreply { display: none; } .addreply.open { display: grid; gap: 8px; }
+.saved { font-size: 12px; color: var(--good); min-height: 16px; }
+.pricehist { font-size: 12.5px; color: var(--muted); }
+
+.compare { margin-top: 8px; }
+.compare h2 { font-size: 20px; margin-bottom: 10px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 900px; }
+th, td { padding: 8px 11px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--surface-2); cursor: pointer; user-select: none; }
+th.sorted { color: var(--fg); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+.sc { font-weight: 600; font-family: var(--display); }
+.howto { margin-top: 20px; font-size: 13px; color: var(--muted); max-width: 72ch; }
+.card { scroll-margin-top: 64px; }
+.kpi { min-width: 0; }
+
+/* Phone layout (iPhone 13: 390px, 16 Pro Max: 430px): filters collapse behind a button, map and chart become tabs, rows stack. */
+.mbar { display: none; }
+@media (max-width: 760px) {
+  body { padding-inline: 12px; font-size: 14px; }
+  header.top { padding-block: 14px 10px; gap: 8px; }
+  header.top h1 { font-size: 23px; }
+  header.top .sub { font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  header.top > div:first-child { min-width: 0; width: 100%; }
+  .hright { gap: 6px; flex-wrap: wrap; }
+  .hright .chip { padding: 5px 9px; white-space: nowrap; }
+  .jumpnav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -12px; padding-inline: 12px; scroll-padding-inline: 12px; }
+  .jumpnav::-webkit-scrollbar { display: none; }
+  .jumpnav a { white-space: nowrap; flex: none; }
+  .ring.est .n { font-size: 12.5px; }
+  .hright { width: 100%; justify-content: flex-start; }
+  .lang button { padding: 6px 9px; font-size: 12px; }
+  .mbar { display: flex; gap: 8px; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 1200; background: var(--bg); padding: 8px 0; margin-bottom: 4px; }
+  .mbar .chip { padding: 8px 12px; font-size: 13px; font-weight: 600; }
+  .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .tabs button { background: var(--surface); border: 0; padding: 7px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted); }
+  .tabs button + button { border-left: 1px solid var(--line); }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); }
+  .layout { gap: 12px; }
+  aside.filters { display: none; }
+  body.filters-open aside.filters { display: grid; }
+  .main { gap: 12px; }
+  .kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi:nth-child(n+4) { display: none; }
+  .kpi { padding: 10px 12px; } .kpi .v { font-size: 20px; } .kpi .s { font-size: 12px; }
+  .panels { grid-template-columns: 1fr; }
+  .panels[data-tab="map"] .panel.chart, .panels[data-tab="chart"] .panel:not(.chart) { display: none; }
+  #map { height: 300px; } .chart svg { height: 300px; }
+  .panel { padding: 10px; }
+  .listhead h2, .compare h2, .decision h2 { font-size: 18px; }
+  .row { grid-template-columns: 92px 1fr; gap: 10px; padding: 10px; }
+  .row .thumb { width: 92px; }
+  .rowmain h2 { font-size: 15.5px; }
+  .rowmain .line2 { white-space: normal; font-size: 12.5px; }
+  .fact { font-size: 12px; padding: 3px 7px; } .fact.price { font-size: 13.5px; }
+  .rowside { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; min-width: 0; }
+  .rowside > * { max-width: 100%; }
+  .ring { grid-row: auto; width: 44px; height: 44px; } .ring svg { width: 44px; height: 44px; } .ring .n { font-size: 14px; }
+  .dfacts, .col { padding: 12px; }
+  .travel { grid-template-columns: 1fr 1fr; }
+  .specs { grid-template-columns: 1fr; }
+  .bars { grid-template-columns: max-content 1fr max-content; font-size: 12px; }
+  .updates li { flex-wrap: wrap; }
+  .howto { font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: no-preference) { .photos .thumbs img { transition: opacity .15s; } }
+/* About me: applicant profile (left) and document vault (right); stacked on phones. */
+.aboutme { display: grid; gap: 12px; scroll-margin-top: 64px; }
+.aboutme h2 { font-size: 20px; }
+.vu-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 700px) { .vu-grid { grid-template-columns: minmax(0, 1fr); } }
+.vu-card, .vu-off { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.vu-card h3, .vu-off h3 { font-size: 16px; } .vu-card h4 { font-size: 14px; margin: 0; font-family: var(--display); }
+.vu-off { max-width: 72ch; } .vu-off p { margin: 0; }
+.vu-cmd { margin: 0; background: var(--surface-2); border-radius: 8px; padding: 9px 12px; overflow-x: auto; font-size: 13px; }
+.vu-hint { margin: 0; color: var(--muted); font-size: 13px; }
+.vu-empty { margin: 0; color: var(--muted); font-size: 13.5px; }
+.vu-form { display: grid; gap: 12px; min-width: 0; }
+.vu-set { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
+.vu-set legend { padding: 0; margin-bottom: 6px; font-size: 14px; font-weight: 600; }
+.vu-fld { display: grid; gap: 4px; font-size: 13.5px; min-width: 0; }
+.vu-fld > label { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+.vu-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+.vu-row3 { grid-template-columns: minmax(80px, 1fr) minmax(80px, 1fr) minmax(140px, 2fr); }
+@media (max-width: 500px) { .vu-row3 { grid-template-columns: 1fr 1fr; } .vu-row3 > :last-child { grid-column: 1 / -1; } }
+.vu-row-end { align-items: center; }
+.aboutme input:not([type=checkbox]), .aboutme select, .aboutme textarea, .docs input:not([type=checkbox]) { padding: 8px 10px; min-height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); width: 100%; min-width: 0; }
+.aboutme input[type=file] { padding: 6px 8px; }
+.docs { display: grid; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); min-width: 0; }
+.docs + .lactions { margin-top: 14px; }
+.docs h4 { font-size: 13.5px; margin: 0; font-family: var(--display); }
+.docs .ld-open { justify-self: start; }
+.ld-reqs { display: grid; gap: 8px; }
+.ld-reqlist { margin: 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 2px; }
+.ld-panel { border: 1px solid var(--line); border-radius: 9px; padding: 12px; }
+.ld-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 14px; }
+.ld-pick .vu-doc { padding: 9px 11px; }
+.ld-pickrow { align-items: flex-start; } .ld-pickrow input { margin-top: 2px; }
+.ld-pickrow input:disabled + .vu-docmain { opacity: .7; } .ld-pickrow:has(input:disabled) { cursor: not-allowed; }
+.ld-days { max-width: 220px; }
+.ld-off { max-width: none; box-shadow: none; padding: 12px; gap: 8px; font-size: 13.5px; }
+.ld-new { border-color: var(--good); box-shadow: none; padding: 12px; gap: 10px; }
+.ld-linkrow { display: flex; gap: 8px; min-width: 0; } .ld-linkrow input { flex: 1 1 auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.ld-shares { display: grid; gap: 8px; }
+.ld-share .vu-dochead { gap: 8px; }
+.ld-opens summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.ld-opens ol { margin: 6px 0 0; padding-left: 20px; font-size: 13px; display: grid; gap: 2px; }
+dialog.sx.ld-warn { max-width: 520px; }
+.sx.ld-warn .bar { flex-wrap: wrap; }
+@media (max-width: 560px) { .sx.ld-warn .bar { flex-direction: column-reverse; align-items: stretch; } .sx.ld-warn .bar > span { display: none; } }
+.aboutme textarea { resize: vertical; min-height: 96px; }
+.vu-check { display: flex; gap: 8px; align-items: center; font-size: 13.5px; cursor: pointer; }
+.vu-check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; flex: none; }
+.vu-count { justify-self: end; font-size: 12px; color: var(--muted); }
+.vu-bar, .vu-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vu-btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.vu-btn:hover { background: var(--info-bg); }
+.vu-btn.primary { background: var(--accent); color: var(--accent-fg); } .vu-btn.primary:hover { filter: brightness(1.08); }
+.vu-btn.danger { border-color: var(--bad); color: var(--bad); } .vu-btn.danger:hover { background: var(--bad-bg); }
+.vu-btn:disabled { opacity: .5; cursor: not-allowed; filter: none; background: transparent; }
+.vu-btn.primary:disabled { background: var(--accent); }
+.vu-saved { font-size: 13px; color: var(--good); }
+.vu-err { color: var(--bad); font-size: 13.5px; white-space: pre-line; } .vu-err:empty { display: none; }
+.vu-err ul { margin: 4px 0 0; padding-left: 18px; }
+.vu-summary { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.vu-upload { border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+.vu-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.vu-doc { border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; display: grid; gap: 8px; min-width: 0; }
+.vu-docmain { display: grid; gap: 2px; min-width: 0; }
+.vu-dochead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vu-doclabel { overflow-wrap: anywhere; }
+.vu-docmeta { font-size: 12.5px; color: var(--muted); }
+.vu-docacts .vu-btn { height: 34px; padding: 0 12px; font-size: 13px; }
+.vu-badge { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); }
+.vu-badge.muted { color: var(--muted); cursor: help; }
+.vu-badge.good { background: var(--good-bg); color: var(--good); } .vu-badge.warn { background: var(--warn-bg); color: var(--warn); cursor: help; }
+#aboutbtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+/* Contacting landlords: the header pause switch and the template editor in Settings (public/outreach-ui.js). */
+.sendsw .sh { display: none; }
+.sendsw.on { border-color: var(--good); color: var(--fg); } .sendsw.on .dot { color: var(--good); opacity: 1; }
+.sendsw.paused { background: var(--warn); border-color: var(--warn); color: #1b1305; font-weight: 700; } .sendsw.paused .dot { border-radius: 1px; opacity: 1; }
+@media (max-width: 700px) { .sendsw .lg { display: none; } .sendsw .sh { display: inline; } }
+.sendsw:disabled { opacity: .6; cursor: progress; }
+.sx .tpl-list { display: grid; gap: 14px; margin-top: 8px; } .sx .tpl-h { margin: 6px 0 0; font-size: 16px; }
+.sx .tpl-card { border: 1px solid var(--line); border-radius: 9px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+.sx .tpl-card h5 { margin: 0; font-size: 15px; }
+.sx .tpl-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.sx .tpl-tabs, .sx .tpl-tokens, .sx .tpl-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sx .tpl-chip { font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; } .sx .tpl-chip.good { background: var(--good-bg); color: var(--good); } .sx .tpl-chip.warn { background: var(--warn-bg); color: var(--warn); }
+.sx .tpl-card textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; line-height: 1.45; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); resize: vertical; }
+.sx .tpl-err:empty, .sx .tpl-out:empty { display: none; } .sx .tpl-err div { margin: 0; }
+.sx .tpl-preview { margin: 0; padding: 10px; background: var(--surface-2); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13.5px; }
+.sx .tpl-warn { color: var(--warn); font-size: 13px; font-weight: 600; margin: 6px 0 0; }
+.sx .tpl-acts .vu-btn { height: 36px; padding: 0 14px; font-size: 13.5px; }
+[hidden] { display: none !important; }
+/* Dialogs (wizard, Settings, Add a listing): pinned near the top, scrolling body, button bar always at the bottom. */
+dialog.sx { border: 1px solid var(--line); border-radius: var(--radius); padding: 0; margin: 6vh auto auto; max-width: 720px; width: calc(100% - 32px); max-height: 88vh; background: var(--surface); color: var(--fg); box-shadow: 0 12px 40px rgba(16, 24, 40, .18); overflow: hidden; }
+dialog.sx::backdrop { background: rgba(0, 0, 0, .35); }
+.sx form { display: flex; flex-direction: column; max-height: 88vh; }
+.sx .sxhead { padding: 18px 20px 12px; border-bottom: 1px solid var(--line); display: grid; gap: 12px; }
+.sx .sxbody { padding: 16px 20px; display: grid; gap: 14px; align-content: start; overflow-y: auto; max-height: 70vh; min-height: 0; flex: 1 1 auto; overscroll-behavior: contain; }
+.sx.wiz .sxbody { height: 62vh; }
+.sx .sxfoot { padding: 10px 20px 16px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.sx .sxfoot .err:empty { display: none; }
+.sx h2 { margin: 0; font-size: 20px; } .sx h3 { font-size: 15px; }
+.sx fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; min-width: 0; }
+.sx legend { padding: 0; margin-bottom: 6px; font-size: 14px; font-weight: 600; }
+.sx label { display: grid; gap: 4px; font-size: 14px; }
+.sx .fld { display: grid; gap: 4px; font-size: 14px; }
+.sx .opts { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.sx .opts label { display: flex; gap: 6px; align-items: center; }
+.sx input[type=checkbox], .sx input[type=radio], .sx input[type=range] { accent-color: var(--accent); }
+.sx input[type=text], .sx input[type=number], .sx input[type=url], .sx input[type=date], .sx input[type=time], .sx select, .sx textarea { padding: 8px 10px; min-height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); width: 100%; min-width: 0; }
+.sx .frow { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+.sx .addr { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.sx .grp { display: grid; gap: 10px; }
+.sx .sub { display: grid; gap: 10px; padding-left: 12px; border-left: 2px solid var(--line); }
+.sx .places { display: grid; gap: 10px; }
+.sx .place { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.sx .intro { margin: 0; color: var(--fg); background: var(--surface-2); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.sx .weight .wl { display: flex; justify-content: space-between; gap: 8px; }
+.sx .weight .wv { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 2.5ch; text-align: right; }
+.sx .bar { display: flex; align-items: center; gap: 8px; }
+.sx .bar > span { flex: 1; }
+.sx button { height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; }
+.sx button:hover { background: var(--info-bg); }
+.sx button.primary { background: var(--accent); color: var(--accent-fg); }
+.sx button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+.sx button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; box-shadow: 0 0 0 4px var(--info-bg); }
+.sx button:disabled { opacity: .5; cursor: not-allowed; filter: none; }
+.sx .stepper { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; counter-reset: none; }
+.sx .stepper li { display: grid; justify-items: center; gap: 4px; text-align: center; font-size: 11.5px; line-height: 1.25; color: var(--muted); position: relative; }
+.sx .stepper li + li::before { content: ""; position: absolute; top: 11px; right: calc(50% + 14px); width: calc(100% - 22px); height: 2px; background: var(--line); }
+.sx .stepper li.done + li::before { background: var(--accent); }
+.sx .stepper .dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--muted); }
+.sx .stepper li.done .dot { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.sx .stepper li.cur { color: var(--accent); }
+.sx .stepper .nm { height: 2.5em; overflow: hidden; }
+.sx .stepper li.cur .dot { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 560px) { .sx .stepper .nm { display: none; } .sx .sxhead, .sx .sxbody, .sx .sxfoot { padding-inline: 14px; } .sx button { padding: 0 14px; } }
+.sx .err { color: var(--bad); font-size: 14px; white-space: pre-line; margin: 0; } .sx .hint { color: var(--muted); font-size: 13px; margin: 0; }
+/* Redaction helper: full-screen dialog, pages stacked, black boxes drawn on an overlay canvas. */
+dialog.sx.rd { margin: 0; width: 100%; max-width: none; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
+.sx.rd form { height: 100%; max-height: none; }
+.sx.rd .sxbody { max-height: none; flex: 1 1 0; background: var(--surface-2); }
+.rd-pages { display: grid; gap: 18px; justify-items: center; padding-bottom: 8px; }
+.rd-page { margin: 0; width: 100%; max-width: 900px; display: grid; gap: 6px; justify-items: center; }
+.rd-stack { position: relative; width: 100%; box-shadow: 0 1px 6px rgba(16, 24, 40, .18); background: #fff; }
+.rd-page.active .rd-stack { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rd-stack canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.rd-overlay { touch-action: none; cursor: crosshair; }
+.rd-body.scrolling .rd-overlay { touch-action: pan-x pan-y pinch-zoom; cursor: default; }
+.sx .rd-tools { flex-wrap: wrap; }
+.rd-count { font-size: 13px; color: var(--muted); margin-left: auto; }
+.rd-mode { display: none; }
+@media (pointer: coarse) { .rd-mode { display: inline-flex; align-items: center; } }
+@media (max-width: 560px) { .sx.rd .sxhead .hint { font-size: 12.5px; } .sx.rd .bar button { padding: 0 12px; } }
+body.setup .wrap{display:none}
+/* Area panel (public/area-ui.js) and the sources footer */
+section.area { margin-top: 16px; min-width: 0; }
+.area-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.area-head h3.sp { margin: 0; }
+.area-places th, .area-places td:nth-child(-n+2) { white-space: normal; }
+.area-places td:nth-child(2) { overflow-wrap: anywhere; }
+.area-head .btn { margin-left: auto; padding: 4px 10px; font-size: 12.5px; }
+.area-asof { font-size: 12px; }
+.area-status { margin: 6px 0 0; font-size: 13px; }
+.area-status:empty { display: none; }
+.area-blocks { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 10px; }
+.area-fig { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.area-fig h4 { margin: 0 0 5px; font-size: 13px; font-weight: 600; }
+.area-txt { margin: 0 0 4px; font-size: 13.5px; }
+.area-txt.warn { color: var(--warn); font-weight: 600; }
+.area-note { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+.area-list { margin: 2px 0 4px 18px; padding: 0; font-size: 13px; }
+.area-src { margin: 6px 0 0; font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+.area-src a { color: inherit; }
+.area-places { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.area-places table { width: 100%; min-width: 280px; }
+.area-places th, .area-places td { padding: 6px 8px; vertical-align: top; }
+.area-lines { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.area-line { font-size: 11px; font-weight: 600; padding: 0 5px; border-radius: 4px; background: var(--surface-3); cursor: help; }
+.area-est { display: block; color: var(--muted); font-size: 11px; }
+.bars .bl.tipped { cursor: help; text-decoration: underline dotted; }
+footer.sources { margin-top: 18px; font-size: 12px; color: var(--muted); max-width: 90ch; }
+footer.sources h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 6px; }
+footer.sources ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; overflow-wrap: anywhere; }
+footer.sources b { font-weight: 600; color: var(--fg); }
+footer.sources a { color: inherit; }
+@media (max-width: 700px) { .area-head .btn { margin-left: 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1 id="apptitle">Flat Hunt</h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="hright">
+      <button class="chip sendsw" id="sendsw" type="button" role="switch" hidden></button>
+      <button class="chip" id="addlisting" type="button"></button>
+      <button class="chip" id="settings" type="button"></button>
+      <button class="chip" id="aboutbtn" type="button" aria-controls="aboutme" aria-pressed="false"></button>
+      <button class="newpill" id="newpill" type="button" hidden></button>
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en">EN</button><button type="button" data-lang="de">DE</button><button type="button" data-lang="pt">PT-BR</button>
+      </div>
+    </div>
+  </header>
+
+
+  <div class="mbar" id="mbar">
+    <button type="button" id="fbtn" class="chip"></button>
+    <div class="tabs" role="tablist"><button type="button" data-tab="map" role="tab"></button><button type="button" data-tab="chart" role="tab"></button></div>
+  </div>
+
+  <div class="layout">
+    <aside class="filters" id="filters"></aside>
+    <div class="main">
+      <nav class="jumpnav" id="jumpnav" aria-label="Page sections"></nav>
+      <section class="welcome" id="welcome" hidden></section>
+      <section class="stale" id="stale" role="status" hidden></section>
+      <section class="aboutme" id="aboutme" hidden></section>
+      <div class="kpis" id="kpis"></div>
+      <section class="decision" id="decision"></section>
+      <div class="updates" id="updates" hidden></div>
+      <div class="listhead" id="listings"><h2 id="listtitle"></h2><div class="actions"><span class="muted" id="count"></span></div></div>
+      <div class="cards" id="cards"><p class="empty" id="loading"></p></div>
+      <section class="costs" id="costs"></section>
+      <div class="panels" id="explore">
+        <div class="panel"><h3 id="maptitle"></h3><div id="map"></div><div class="legend" id="maplegend"></div></div>
+        <div class="panel chart"><h3 id="charttitle"></h3><div class="chipset chartmode" id="chartmode" hidden></div><div id="chart"></div><div class="legend" id="chartlegend"></div></div>
+      </div>
+      <section class="compare" id="compare"><h2 id="cmptitle"></h2><div class="tablewrap"><table id="cmp"></table></div></section>
+      <p class="howto" id="howto"></p>
+      <footer class="sources" id="sources"></footer>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="money.js"></script>
+<script src="criteria.js"></script>
+<script src="area-sources.js"></script>
+<script src="area-ui.js"></script>
+<script src="outreach-ui.js"></script>
+<script src="setup.js"></script>
+<script src="vault-ui.js"></script>
+<script src="imagepdf.js"></script>
+<script src="redact.js"></script>
+<script>
+(function () {
+  let P = null, CAT = [];
+  const I18N = {
+    en: { locale: "en-GB",
+      sub: (n, modes, d) => `${n} ${n === 1 ? "listing" : "listings"} · ${modes}${d ? " · last listing check " + d : ""}`,
+      modesTxt: { rent: "rent", buy: "buy", both: "rent and buy" },
+      newSince: n => `${n} new since your last visit`,
+      head: ["Add a listing", "Settings", "About me"],
+      status: { new: "New", contacted: "Contacted", "viewing-invited": "Viewing invited", "viewing-done": "Viewing done", applied: "Applied", "docs-requested": "Documents requested", accepted: "Accepted", rejected: "Rejected", dropped: "Dropped", gone: "Gone" },
+      mode: { rent: "Rent", buy: "Buy" },
+      placeMode: { car: "car", transit: "transit", bike: "bike" },
+      outdoor: { none: "none", balcony: "balcony", garden: "garden", both: "balcony and garden" },
+      contactType: { private: "Private landlord", agent: "Agent", company: "Housing company" },
+      yes: "yes", no: "no", any: "any", min: "min",
+      fStatus: "Status", fMode: "Rent or buy", fBoth: "Both", fLimits: "Limits", fShow: "Show", fSort: "Sort by", reset: "Reset filters", fBtn: n => "Filters" + (n ? " · " + n : ""), fClose: "Hide filters", tabMap: "Map", tabChart: "Chart",
+      maxWarm: "Max warm rent", maxPrice: "Max price", minRooms: "Min rooms", minSize: "Min size",
+      search: "Search title, address or district", savedOnly: "Shortlist only", inCriteria: "Only listings that match my criteria", hideOut: "Hide rejected, dropped and gone",
+      sortOpts: { rec: "Recommendation", score: "Score", price: "Price", ppsqm: "Price per m²", size: "Size (largest)", commute: p => p ? `Commute to ${p}` : "Commute to first place", newest: "Newest" },
+      kpiMatch: "listings match", tracked: n => `${n} tracked`, kpiBest: "best score", kpiCheapRent: "cheapest warm rent", kpiCheapBuy: "cheapest price", kpiLargest: "largest", kpiCommute: p => `shortest to ${p}`,
+      nav: { aboutme: "About me", decision: "Focus", listings: "Listings", costs: "Costs", explore: "Map & chart", compare: "Compare" },
+      focus: "Listings worth a closer look", focusHint: "Shortlisted listings first, then the highest scored ones still available. Scores summarise the data; see the flat before deciding.", noFocus: "No available listings match your filters.", details: "Open details", score: "score", perMonth: "/month", loanMonth: "loan/month",
+      map: "Where they are", radius: "Search radius", scoreHigh: "≥ 70 good", scoreMid: "55–69 fair", scoreLow: "< 55 weak",
+      chart: m => m === "buy" ? "Price vs size, coloured by score" : "Warm rent vs size, coloured by score", limitRent: "max warm rent", limitBuy: "max price", noChart: "No listings with size and price to plot yet.",
+      list: "Ranked list", count: (s, t) => `${s} shown · ${t} tracked`, loading: "Loading…", noMatch: "No listing matches these filters.", loadFail: "Could not load the listings.",
+      updates: "Latest changes", upNew: "new", upPrice: "price", upGone: "gone", upBack: "back", newBadge: "NEW", gone: "Listing gone",
+      outside: "Outside your criteria", estTip: "Estimated from price, size, commute and the area facts; condition and contact are not rated yet",
+      redFlag: n => n === 1 ? "Red flag" : `${n} red flags`, warm: "warm", cold: "cold", rooms: n => `${n} ${n === 1 ? "room" : "rooms"}`,
+      floor: f => f === 0 ? "ground floor" : f < 0 ? "basement" : `floor ${f}`, from: d => `from ${d}`, now: "available now",
+      commuteChip: (l, m, mode) => `${l} ${m} min · ${mode}`, commuteUnknown: l => `${l} ?`, commuteUnknownTip: "Commute time unknown: the lookup failed or the address is missing.", overLimit: m => `Over your ${m} min limit`, withinLimit: m => `Within your ${m} min limit`,
+      afford: { fits: "Fits", tight: "Tight", "too-much": "Too much", unknown: "Affordability unknown" }, ofIncome: "of income", setIncome: "set income", setIncomeTip: "Set your net income in Settings to see whether this fits.", noPrice: "No price yet",
+      shortlist: "Shortlist", shortlisted: "Shortlisted", compare: "Compare costs", comparing: "In cost comparison",
+      staleTitle: "Commute times are out of date", staleText: "Your places changed after these times were calculated.", recalc: "Recalculate", recalcing: "Recalculating…", recalcFail: "Could not recalculate the commute times.",
+      facts: "Facts", specs: { mode: "Rent or buy", warmRent: "Warm rent", coldRent: "Cold rent", utilities: "Utilities", deposit: "Deposit", takeover: "Takeover (furniture, kitchen)", price: "Price", ppsqm: "Price per m²", rooms: "Rooms", size: "Size", floor: "Floor", lift: "Lift", outdoor: "Outdoor space", kitchen: "Fitted kitchen", pets: "Pets allowed", available: "Available from", wbs: "Housing permit (WBS) needed", address: "Address", district: "District", source: "Source" },
+      commuteH: "Commute", commuteCols: ["Place", "By", "Time", "Limit"], commuteNote: "Car and bike times from OpenStreetMap routing, public transport from Transitous for a weekday arriving by the place's time. Traffic is not included.", checked: d => `checked ${d}`,
+      contactH: "Contact", costsH: "Costs", affordH: "Affordability",
+      rentMonthly: "Warm rent per month", coldPlus: (c, u) => `cold ${c} + utilities ${u}`, oneOff: "One-off", depositTakeover: "Deposit + takeover", takeoverShort: "Takeover", unknown: "unknown", plusUnknown: "+ unknown", hiddenBy: n => `${n} hidden by your criteria or red flags.`, showThem: "Show them",
+      price: "Price", transferTax: (st, p) => `Land-transfer tax (${st}, ${p} %)`, notary: "Notary and land registry (2 %)", agent: p => `Agent fee (${p} %)`, purchaseCosts: "Purchase costs", ofWhichCosts: "of which purchase costs", costsFinanced: "purchase costs not covered by equity (financed):", equity: "Equity", loan: "Loan", monthlyPay: (apr, y) => `Monthly payment (${apr} % over ${y} years)`, taxNote: d => `Land-transfer tax rates as of ${d}; check before buying.`,
+      take: "Assessment", questions: "Questions to ask", rating: { price: "Price", size: "Size", commute: "Commute", area: "Area", condition: "Condition", contact: "Landlord / contact" },
+      flagsH: "Red flags", conv: "Conversation", noMsgs: "No messages yet.", statusL: "Status", next: "Next step", nextPh: "e.g. send documents by Friday", notes: "My notes", notesPh: "Impressions from the viewing, questions, things to check…",
+      logReply: "Log a reply", cancel: "Cancel", fromL: "From", via: "Via", vias: ["Phone", "Email", "Portal message", "WhatsApp", "In person"], said: "What they said", add: "Add to conversation",
+      edit: "Edit details", del: "Delete listing", confirmDelete: t => `Delete “${t}”? This removes the listing, its notes and messages, and cannot be undone.`, saved: "Saved", saveFail: "Could not save", priceHist: "Price history", listing: "Listing", mapLink: "Map",
+      crit: { mode: m => `${m} is switched off in Settings`, warm: (v, l) => `Warm rent ${v} is above your limit of ${l}`, cold: (v, l) => `Cold rent ${v} is above your limit of ${l}`, deposit: (v, l) => `Deposit ${v} is above your limit of ${l}`, takeover: (v, l) => `Takeover ${v} is above your limit of ${l}`, price: (v, l) => `Price ${v} is above your limit of ${l}`,
+        rooms: (v, r) => `${v} rooms, you want ${r}`, size: (v, r) => `${v}, you want ${r}`, floor: (v, r) => `${v}, you want ${r}`, lift: "No lift", outdoor: v => `Outdoor space: ${v}`, kitchen: "No fitted kitchen", pets: "Pets not allowed",
+        moveinEarly: (d, f) => `Available from ${d}, before your move-in window starts on ${f}`, moveinLate: (d, t) => `Available from ${d}, after your move-in window ends on ${t}`, wbs: "Needs a housing permit (WBS)", commute: (l, m, max) => `${l}: ${m} min, your limit is ${max} min`, radius: (d, k) => `${d} km from your search centre, your radius is ${k} km` },
+      range: (a, b) => b == null ? `at least ${a}` : a == null ? `at most ${b}` : `${a} to ${b}`,
+      costTitle: "What will each flat cost?", costIntro: "Planning estimate. Choose up to six listings to compare.", costPick: "Listings to compare", reserve: "Maintenance reserve €/m² per month (buying)",
+      rentPart: "Warm rent", loanPart: "Loan payment", reservePart: "Maintenance reserve", limitLine: (a, p) => `Your limit ${a} (${p} of income)`, noIncome: "Set your net income in Settings to see your limit.", costEmpty: "Choose listings above to compare their costs.",
+      costNote: "Bars show monthly housing costs. Renting: warm rent (cold rent plus utilities). Buying: loan payment at your rate and term plus the maintenance reserve; property tax and service charges are not included. One-off: deposit and takeover, or the equity you put in, which pays the purchase costs first; any part of those costs equity does not cover is financed.",
+      cmp: "Selected listings side by side", cols: ["Listing", "Score", "Rent/buy", "Warm rent / price", "€/m²", "Rooms", "m²", "Floor", "Available", "Commute", "Affordability", "Status"],
+      howto: "Scores combine the ratings you weight in Settings: price, size, commute, area, condition and contact. Listings without an assessment get an estimate (≈) from price, size, commute and the area facts. Filters, map and chart work together: narrow the list, then click a marker or dot to open that listing. Shortlisting does not contact anyone.",
+      welcomeTitle: "No listings yet", welcomeText: "Add a listing you like and Flat Hunt checks it against your criteria, commute limits and budget." },
+    de: { locale: "de-DE",
+      sub: (n, modes, d) => `${n} ${n === 1 ? "Inserat" : "Inserate"} · ${modes}${d ? " · letzte Inseratsprüfung " + d : ""}`,
+      modesTxt: { rent: "Miete", buy: "Kauf", both: "Miete und Kauf" },
+      newSince: n => `${n} neu seit deinem letzten Besuch`,
+      head: ["Inserat hinzufügen", "Einstellungen", "Über mich"],
+      status: { new: "Neu", contacted: "Angefragt", "viewing-invited": "Zur Besichtigung eingeladen", "viewing-done": "Besichtigt", applied: "Beworben", "docs-requested": "Unterlagen angefordert", accepted: "Zusage", rejected: "Absage", dropped: "Gestrichen", gone: "Weg" },
+      mode: { rent: "Miete", buy: "Kauf" },
+      placeMode: { car: "Auto", transit: "ÖPNV", bike: "Rad" },
+      outdoor: { none: "keiner", balcony: "Balkon", garden: "Garten", both: "Balkon und Garten" },
+      contactType: { private: "Privatvermieter", agent: "Makler", company: "Wohnungsgesellschaft" },
+      yes: "ja", no: "nein", any: "egal", min: "Min.",
+      fStatus: "Status", fMode: "Miete oder Kauf", fBoth: "Beides", fLimits: "Grenzen", fShow: "Anzeigen", fSort: "Sortieren nach", reset: "Filter zurücksetzen", fBtn: n => "Filter" + (n ? " · " + n : ""), fClose: "Filter ausblenden", tabMap: "Karte", tabChart: "Diagramm",
+      maxWarm: "Max. Warmmiete", maxPrice: "Max. Kaufpreis", minRooms: "Min. Zimmer", minSize: "Min. Wohnfläche",
+      search: "Titel, Adresse oder Stadtteil suchen", savedOnly: "Nur vorgemerkte", inCriteria: "Nur Inserate, die zu meinen Kriterien passen", hideOut: "Absagen, Gestrichene und Weggefallene ausblenden",
+      sortOpts: { rec: "Empfehlung", score: "Punkte", price: "Preis", ppsqm: "Preis pro m²", size: "Fläche (größte)", commute: p => p ? `Weg zu ${p}` : "Weg zum ersten Ort", newest: "Neueste" },
+      kpiMatch: "Inserate passen", tracked: n => `${n} erfasst`, kpiBest: "beste Wertung", kpiCheapRent: "günstigste Warmmiete", kpiCheapBuy: "günstigster Kaufpreis", kpiLargest: "größte", kpiCommute: p => `kürzester Weg zu ${p}`,
+      nav: { aboutme: "Über mich", decision: "Im Fokus", listings: "Inserate", costs: "Kosten", explore: "Karte & Diagramm", compare: "Vergleich" },
+      focus: "Inserate für die engere Auswahl", focusHint: "Zuerst vorgemerkte Inserate, dann die bestbewerteten verfügbaren. Punkte fassen die Daten zusammen; die Wohnung vor der Entscheidung ansehen.", noFocus: "Keine verfügbaren Inserate passen zu den Filtern.", details: "Details öffnen", score: "Punkte", perMonth: "/Monat", loanMonth: "Kredit/Monat",
+      map: "Wo sie liegen", radius: "Suchradius", scoreHigh: "≥ 70 gut", scoreMid: "55–69 okay", scoreLow: "< 55 schwach",
+      chart: m => m === "buy" ? "Kaufpreis vs. Fläche, Farbe = Punkte" : "Warmmiete vs. Fläche, Farbe = Punkte", limitRent: "max. Warmmiete", limitBuy: "max. Kaufpreis", noChart: "Noch keine Inserate mit Fläche und Preis.",
+      list: "Rangliste", count: (s, t) => `${s} angezeigt · ${t} erfasst`, loading: "Lädt…", noMatch: "Kein Inserat passt zu diesen Filtern.", loadFail: "Inserate konnten nicht geladen werden.",
+      updates: "Letzte Änderungen", upNew: "neu", upPrice: "Preis", upGone: "weg", upBack: "wieder da", newBadge: "NEU", gone: "Inserat weg",
+      outside: "Außerhalb deiner Kriterien", estTip: "Geschätzt aus Preis, Fläche, Wegen und den Umgebungsdaten; Zustand und Kontakt sind noch nicht bewertet",
+      redFlag: n => n === 1 ? "Warnzeichen" : `${n} Warnzeichen`, warm: "warm", cold: "kalt", rooms: n => `${n} Zi.`,
+      floor: f => f === 0 ? "Erdgeschoss" : f < 0 ? "Untergeschoss" : `${f}. OG`, from: d => `ab ${d}`, now: "sofort frei",
+      commuteChip: (l, m, mode) => `${l} ${m} Min. · ${mode}`, commuteUnknown: l => `${l} ?`, commuteUnknownTip: "Wegzeit unbekannt: Die Abfrage ist fehlgeschlagen oder die Adresse fehlt.", overLimit: m => `Über deiner Grenze von ${m} Min.`, withinLimit: m => `Innerhalb deiner Grenze von ${m} Min.`,
+      afford: { fits: "Passt", tight: "Knapp", "too-much": "Zu teuer", unknown: "Bezahlbarkeit unbekannt" }, ofIncome: "des Einkommens", setIncome: "Einkommen eintragen", setIncomeTip: "Trage dein Nettoeinkommen in den Einstellungen ein, um zu sehen, ob es passt.", noPrice: "Noch kein Preis",
+      shortlist: "Vormerken", shortlisted: "Vorgemerkt", compare: "Kosten vergleichen", comparing: "Im Kostenvergleich",
+      staleTitle: "Die Wegzeiten sind veraltet", staleText: "Deine Orte haben sich geändert, nachdem diese Zeiten berechnet wurden.", recalc: "Neu berechnen", recalcing: "Wird berechnet…", recalcFail: "Die Wegzeiten konnten nicht neu berechnet werden.",
+      facts: "Eckdaten", specs: { mode: "Miete oder Kauf", warmRent: "Warmmiete", coldRent: "Kaltmiete", utilities: "Nebenkosten", deposit: "Kaution", takeover: "Ablöse (Möbel, Küche)", price: "Kaufpreis", ppsqm: "Preis pro m²", rooms: "Zimmer", size: "Wohnfläche", floor: "Etage", lift: "Aufzug", outdoor: "Außenfläche", kitchen: "Einbauküche", pets: "Haustiere erlaubt", available: "Frei ab", wbs: "Wohnberechtigungsschein (WBS) nötig", address: "Adresse", district: "Stadtteil", source: "Quelle" },
+      commuteH: "Wege", commuteCols: ["Ort", "Mit", "Zeit", "Grenze"], commuteNote: "Auto- und Radzeiten aus dem OpenStreetMap-Routing, ÖPNV von Transitous für einen Werktag mit Ankunft zur Uhrzeit des Ortes. Ohne Verkehr.", checked: d => `geprüft ${d}`,
+      contactH: "Kontakt", costsH: "Kosten", affordH: "Bezahlbarkeit",
+      rentMonthly: "Warmmiete pro Monat", coldPlus: (c, u) => `kalt ${c} + Nebenkosten ${u}`, oneOff: "Einmalig", depositTakeover: "Kaution + Ablöse", takeoverShort: "Ablöse", unknown: "unbekannt", plusUnknown: "+ unbekannt", hiddenBy: n => `${n} durch deine Kriterien oder Warnzeichen ausgeblendet.`, showThem: "Anzeigen",
+      price: "Kaufpreis", transferTax: (st, p) => `Grunderwerbsteuer (${st}, ${p} %)`, notary: "Notar und Grundbuch (2 %)", agent: p => `Maklerprovision (${p} %)`, purchaseCosts: "Kaufnebenkosten", ofWhichCosts: "davon Kaufnebenkosten", costsFinanced: "Kaufnebenkosten nicht durch Eigenkapital gedeckt (finanziert):", equity: "Eigenkapital", loan: "Kredit", monthlyPay: (apr, y) => `Monatliche Rate (${apr} % über ${y} Jahre)`, taxNote: d => `Grunderwerbsteuersätze Stand ${d}; vor dem Kauf prüfen.`,
+      take: "Einschätzung", questions: "Offene Fragen", rating: { price: "Preis", size: "Fläche", commute: "Wege", area: "Umgebung", condition: "Zustand", contact: "Vermieter / Kontakt" },
+      flagsH: "Warnzeichen", conv: "Verlauf", noMsgs: "Noch keine Nachrichten.", statusL: "Status", next: "Nächster Schritt", nextPh: "z. B. Unterlagen bis Freitag schicken", notes: "Meine Notizen", notesPh: "Eindrücke von der Besichtigung, Fragen, was zu prüfen ist…",
+      logReply: "Antwort eintragen", cancel: "Abbrechen", fromL: "Von", via: "Über", vias: ["Telefon", "E-Mail", "Portal-Nachricht", "WhatsApp", "Persönlich"], said: "Was gesagt wurde", add: "Zum Verlauf hinzufügen",
+      edit: "Angaben bearbeiten", del: "Inserat löschen", confirmDelete: t => `„${t}“ löschen? Das entfernt das Inserat, seine Notizen und Nachrichten und lässt sich nicht rückgängig machen.`, saved: "Gespeichert", saveFail: "Speichern fehlgeschlagen", priceHist: "Preisverlauf", listing: "Inserat", mapLink: "Karte",
+      crit: { mode: m => `${m} ist in den Einstellungen ausgeschaltet`, warm: (v, l) => `Warmmiete ${v} liegt über deiner Grenze von ${l}`, cold: (v, l) => `Kaltmiete ${v} liegt über deiner Grenze von ${l}`, deposit: (v, l) => `Kaution ${v} liegt über deiner Grenze von ${l}`, takeover: (v, l) => `Ablöse ${v} liegt über deiner Grenze von ${l}`, price: (v, l) => `Kaufpreis ${v} liegt über deiner Grenze von ${l}`,
+        rooms: (v, r) => `${v} Zimmer, gewünscht ${r}`, size: (v, r) => `${v}, gewünscht ${r}`, floor: (v, r) => `${v}, gewünscht ${r}`, lift: "Kein Aufzug", outdoor: v => `Außenfläche: ${v}`, kitchen: "Keine Einbauküche", pets: "Haustiere nicht erlaubt",
+        moveinEarly: (d, f) => `Frei ab ${d}, vor dem Beginn deines Einzugszeitraums am ${f}`, moveinLate: (d, t) => `Frei ab ${d}, nach dem Ende deines Einzugszeitraums am ${t}`, wbs: "Nur mit Wohnberechtigungsschein (WBS)", commute: (l, m, max) => `${l}: ${m} Min., deine Grenze ist ${max} Min.`, radius: (d, k) => `${d} km vom Suchmittelpunkt, dein Radius ist ${k} km` },
+      range: (a, b) => b == null ? `mindestens ${a}` : a == null ? `höchstens ${b}` : `${a} bis ${b}`,
+      costTitle: "Was kostet jede Wohnung?", costIntro: "Planungsrechnung. Bis zu sechs Inserate zum Vergleich auswählen.", costPick: "Inserate vergleichen", reserve: "Instandhaltungsrücklage €/m² pro Monat (Kauf)",
+      rentPart: "Warmmiete", loanPart: "Kreditrate", reservePart: "Instandhaltungsrücklage", limitLine: (a, p) => `Deine Grenze ${a} (${p} des Einkommens)`, noIncome: "Trage dein Nettoeinkommen in den Einstellungen ein, um deine Grenze zu sehen.", costEmpty: "Oben Inserate auswählen, um ihre Kosten zu vergleichen.",
+      costNote: "Die Balken zeigen die monatlichen Wohnkosten. Miete: Warmmiete (Kaltmiete plus Nebenkosten). Kauf: Kreditrate zu deinem Zins und deiner Laufzeit plus Instandhaltungsrücklage; Grundsteuer und Hausgeld sind nicht enthalten. Einmalig: Kaution und Ablöse bzw. das eingesetzte Eigenkapital, das zuerst die Kaufnebenkosten deckt; was es davon nicht deckt, wird mitfinanziert.",
+      cmp: "Ausgewählte Inserate im Vergleich", cols: ["Inserat", "Punkte", "Miete/Kauf", "Warmmiete / Preis", "€/m²", "Zimmer", "m²", "Etage", "Frei ab", "Weg", "Bezahlbarkeit", "Status"],
+      howto: "Die Punkte kombinieren die Bewertungen, die du in den Einstellungen gewichtest: Preis, Fläche, Wege, Umgebung, Zustand und Kontakt. Inserate ohne Einschätzung bekommen eine Schätzung (≈) aus Preis, Fläche, Wegen und den Umgebungsdaten. Filter, Karte und Diagramm arbeiten zusammen: Liste eingrenzen, dann Marker oder Punkt anklicken, um das Inserat zu öffnen. Vormerken schreibt niemanden an.",
+      welcomeTitle: "Noch keine Inserate", welcomeText: "Füge ein Inserat hinzu, das dir gefällt, und Flat Hunt prüft es gegen deine Kriterien, Wegzeiten und dein Budget." },
+    pt: { locale: "pt-BR",
+      sub: (n, modes, d) => `${n} ${n === 1 ? "anúncio" : "anúncios"} · ${modes}${d ? " · última verificação dos anúncios " + d : ""}`,
+      modesTxt: { rent: "aluguel", buy: "compra", both: "aluguel e compra" },
+      newSince: n => `${n} novos desde sua última visita`,
+      head: ["Adicionar anúncio", "Configurações", "Sobre mim"],
+      status: { new: "Novo", contacted: "Contatado", "viewing-invited": "Convite para visita", "viewing-done": "Visitado", applied: "Candidatura enviada", "docs-requested": "Documentos solicitados", accepted: "Aceito", rejected: "Recusado", dropped: "Descartado", gone: "Indisponível" },
+      mode: { rent: "Aluguel", buy: "Compra" },
+      placeMode: { car: "carro", transit: "transporte público", bike: "bicicleta" },
+      outdoor: { none: "nenhuma", balcony: "varanda", garden: "jardim", both: "varanda e jardim" },
+      contactType: { private: "Proprietário particular", agent: "Corretor", company: "Empresa de habitação" },
+      yes: "sim", no: "não", any: "qualquer", min: "min",
+      fStatus: "Status", fMode: "Alugar ou comprar", fBoth: "Ambos", fLimits: "Limites", fShow: "Mostrar", fSort: "Ordenar por", reset: "Limpar filtros", fBtn: n => "Filtros" + (n ? " · " + n : ""), fClose: "Ocultar filtros", tabMap: "Mapa", tabChart: "Gráfico",
+      maxWarm: "Aluguel total máx.", maxPrice: "Preço máx.", minRooms: "Cômodos mín.", minSize: "Área mín.",
+      search: "Buscar título, endereço ou bairro", savedOnly: "Só salvos", inCriteria: "Só anúncios dentro dos meus critérios", hideOut: "Ocultar recusados, descartados e indisponíveis",
+      sortOpts: { rec: "Recomendação", score: "Pontuação", price: "Preço", ppsqm: "Preço por m²", size: "Área (maior)", commute: p => p ? `Trajeto até ${p}` : "Trajeto até o primeiro local", newest: "Mais recentes" },
+      kpiMatch: "anúncios no filtro", tracked: n => `${n} registrados`, kpiBest: "melhor pontuação", kpiCheapRent: "aluguel total mais baixo", kpiCheapBuy: "preço mais baixo", kpiLargest: "maior", kpiCommute: p => `trajeto mais curto até ${p}`,
+      nav: { aboutme: "Sobre mim", decision: "Destaques", listings: "Anúncios", costs: "Custos", explore: "Mapa e gráfico", compare: "Comparar" },
+      focus: "Anúncios para olhar de perto", focusHint: "Primeiro os salvos, depois os disponíveis com melhor pontuação. A pontuação resume os dados; visite o apartamento antes de decidir.", noFocus: "Nenhum anúncio disponível corresponde aos filtros.", details: "Abrir detalhes", score: "pontos", perMonth: "/mês", loanMonth: "parcela/mês",
+      map: "Onde ficam", radius: "Raio de busca", scoreHigh: "≥ 70 bom", scoreMid: "55–69 razoável", scoreLow: "< 55 fraco",
+      chart: m => m === "buy" ? "Preço vs. área, cor = pontuação" : "Aluguel total vs. área, cor = pontuação", limitRent: "aluguel total máx.", limitBuy: "preço máx.", noChart: "Ainda não há anúncios com área e preço.",
+      list: "Ranking", count: (s, t) => `${s} exibidos · ${t} registrados`, loading: "Carregando…", noMatch: "Nenhum anúncio corresponde a esses filtros.", loadFail: "Não foi possível carregar os anúncios.",
+      updates: "Últimas mudanças", upNew: "novo", upPrice: "preço", upGone: "saiu", upBack: "voltou", newBadge: "NOVO", gone: "Anúncio saiu",
+      outside: "Fora dos seus critérios", estTip: "Estimada a partir de preço, área, trajeto e dados da região; estado e contato ainda não foram avaliados",
+      redFlag: n => n === 1 ? "Sinal de alerta" : `${n} sinais de alerta`, warm: "total", cold: "sem custos", rooms: n => `${n} ${n === 1 ? "cômodo" : "cômodos"}`,
+      floor: f => f === 0 ? "térreo" : f < 0 ? "subsolo" : `${f}º andar`, from: d => `a partir de ${d}`, now: "disponível já",
+      commuteChip: (l, m, mode) => `${l} ${m} min · ${mode}`, commuteUnknown: l => `${l} ?`, commuteUnknownTip: "Tempo de trajeto desconhecido: a consulta falhou ou falta o endereço.", overLimit: m => `Acima do seu limite de ${m} min`, withinLimit: m => `Dentro do seu limite de ${m} min`,
+      afford: { fits: "Cabe no orçamento", tight: "Apertado", "too-much": "Caro demais", unknown: "Capacidade de pagamento desconhecida" }, ofIncome: "da renda", setIncome: "informar renda", setIncomeTip: "Informe sua renda líquida nas Configurações para ver se cabe no orçamento.", noPrice: "Ainda sem preço",
+      shortlist: "Salvar", shortlisted: "Salvo", compare: "Comparar custos", comparing: "Na comparação de custos",
+      staleTitle: "Os tempos de trajeto estão desatualizados", staleText: "Seus locais mudaram depois que esses tempos foram calculados.", recalc: "Recalcular", recalcing: "Recalculando…", recalcFail: "Não foi possível recalcular os tempos de trajeto.",
+      facts: "Dados", specs: { mode: "Alugar ou comprar", warmRent: "Aluguel total", coldRent: "Aluguel sem custos", utilities: "Custos adicionais", deposit: "Caução", takeover: "Repasse (móveis, cozinha)", price: "Preço", ppsqm: "Preço por m²", rooms: "Cômodos", size: "Área", floor: "Andar", lift: "Elevador", outdoor: "Área externa", kitchen: "Cozinha equipada", pets: "Aceita animais", available: "Disponível a partir de", wbs: "Exige autorização de habitação social (WBS)", address: "Endereço", district: "Bairro", source: "Origem" },
+      commuteH: "Trajetos", commuteCols: ["Local", "Por", "Tempo", "Limite"], commuteNote: "Tempos de carro e bicicleta pelo roteamento do OpenStreetMap, transporte público pelo Transitous num dia útil com chegada no horário do local. Sem trânsito.", checked: d => `verificado em ${d}`,
+      contactH: "Contato", costsH: "Custos", affordH: "Capacidade de pagamento",
+      rentMonthly: "Aluguel total por mês", coldPlus: (c, u) => `aluguel ${c} + custos ${u}`, oneOff: "Pagamento único", depositTakeover: "Caução + repasse", takeoverShort: "Repasse", unknown: "desconhecido", plusUnknown: "+ desconhecido", hiddenBy: n => `${n} ocultos pelos seus critérios ou sinais de alerta.`, showThem: "Mostrar",
+      price: "Preço", transferTax: (st, p) => `Imposto de transmissão (${st}, ${p} %)`, notary: "Cartório e registro (2 %)", agent: p => `Comissão do corretor (${p} %)`, purchaseCosts: "Custos de compra", ofWhichCosts: "dos quais custos de compra", costsFinanced: "custos de compra não cobertos pela entrada (financiados):", equity: "Entrada", loan: "Financiamento", monthlyPay: (apr, y) => `Parcela mensal (${apr} % em ${y} anos)`, taxNote: d => `Alíquotas do imposto de transmissão de ${d}; confira antes de comprar.`,
+      take: "Avaliação", questions: "Perguntas a fazer", rating: { price: "Preço", size: "Área", commute: "Trajeto", area: "Região", condition: "Estado", contact: "Proprietário / contato" },
+      flagsH: "Sinais de alerta", conv: "Conversa", noMsgs: "Nenhuma mensagem ainda.", statusL: "Status", next: "Próximo passo", nextPh: "ex.: enviar documentos até sexta", notes: "Minhas anotações", notesPh: "Impressões da visita, perguntas, o que verificar…",
+      logReply: "Registrar resposta", cancel: "Cancelar", fromL: "De", via: "Por", vias: ["Telefone", "E-mail", "Mensagem no portal", "WhatsApp", "Pessoalmente"], said: "O que disseram", add: "Adicionar à conversa",
+      edit: "Editar dados", del: "Excluir anúncio", confirmDelete: t => `Excluir “${t}”? Isso remove o anúncio, suas anotações e mensagens, e não pode ser desfeito.`, saved: "Salvo", saveFail: "Não foi possível salvar", priceHist: "Histórico de preço", listing: "Anúncio", mapLink: "Mapa",
+      crit: { mode: m => `${m} está desativado nas Configurações`, warm: (v, l) => `Aluguel total ${v} acima do seu limite de ${l}`, cold: (v, l) => `Aluguel sem custos ${v} acima do seu limite de ${l}`, deposit: (v, l) => `Caução ${v} acima do seu limite de ${l}`, takeover: (v, l) => `Repasse ${v} acima do seu limite de ${l}`, price: (v, l) => `Preço ${v} acima do seu limite de ${l}`,
+        rooms: (v, r) => `${v} cômodos, você quer ${r}`, size: (v, r) => `${v}, você quer ${r}`, floor: (v, r) => `${v}, você quer ${r}`, lift: "Sem elevador", outdoor: v => `Área externa: ${v}`, kitchen: "Sem cozinha equipada", pets: "Não aceita animais",
+        moveinEarly: (d, f) => `Disponível a partir de ${d}, antes do início do seu período de mudança em ${f}`, moveinLate: (d, t) => `Disponível a partir de ${d}, depois do fim do seu período de mudança em ${t}`, wbs: "Exige autorização de habitação social (WBS)", commute: (l, m, max) => `${l}: ${m} min, seu limite é ${max} min`, radius: (d, k) => `${d} km do centro da busca, seu raio é ${k} km` },
+      range: (a, b) => b == null ? `pelo menos ${a}` : a == null ? `no máximo ${b}` : `${a} a ${b}`,
+      costTitle: "Quanto custa cada apartamento?", costIntro: "Estimativa de planejamento. Escolha até seis anúncios para comparar.", costPick: "Anúncios para comparar", reserve: "Reserva de manutenção €/m² por mês (compra)",
+      rentPart: "Aluguel total", loanPart: "Parcela do financiamento", reservePart: "Reserva de manutenção", limitLine: (a, p) => `Seu limite ${a} (${p} da renda)`, noIncome: "Informe sua renda líquida nas Configurações para ver seu limite.", costEmpty: "Escolha anúncios acima para comparar os custos.",
+      costNote: "As barras mostram os custos mensais de moradia. Aluguel: aluguel total (aluguel mais custos adicionais). Compra: parcela do financiamento com seus juros e prazo mais a reserva de manutenção; imposto predial e taxa de condomínio não estão incluídos. Pagamento único: caução e repasse, ou a entrada, que paga primeiro os custos de compra; a parte que a entrada não cobre é financiada.",
+      cmp: "Anúncios escolhidos lado a lado", cols: ["Anúncio", "Pontos", "Aluguel/compra", "Aluguel total / preço", "€/m²", "Cômodos", "m²", "Andar", "Disponível", "Trajeto", "Orçamento", "Status"],
+      howto: "A pontuação combina as notas que você pondera nas Configurações: preço, área, trajeto, região, estado e contato. Anúncios sem avaliação recebem uma estimativa (≈) a partir de preço, área, trajeto e dados da região. Filtros, mapa e gráfico trabalham juntos: restrinja a lista e clique num marcador ou ponto para abrir o anúncio. Salvar um anúncio não contata ninguém.",
+      welcomeTitle: "Nenhum anúncio ainda", welcomeText: "Adicione um anúncio de que você gostou e o Flat Hunt o confere com seus critérios, tempos de trajeto e orçamento." }
+  };
+  const STATUSES = ["new", "contacted", "viewing-invited", "viewing-done", "applied", "docs-requested", "accepted", "rejected", "dropped", "gone"];
+  const STATUS_RANK = { accepted: 0, "docs-requested": 1, "viewing-invited": 2, applied: 3, "viewing-done": 3, contacted: 4, new: 5, dropped: 8, rejected: 9, gone: 9 };
+  const statusColor = s => s === "new" ? "var(--muted)" : ["contacted", "viewing-done", "applied"].includes(s) ? "var(--info)" : ["viewing-invited", "docs-requested"].includes(s) ? "var(--warn)" : s === "accepted" ? "var(--good)" : "var(--bad)";
+  const RATING_KEYS = ["price", "size", "commute", "area", "condition", "contact"];
+  const PLACE_COLORS = ["#7c3aed", "#0e7490", "#c2410c", "#be185d", "#4d7c0f"];
+  const $ = (s, r = document) => r.querySelector(s);
+  const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+  const known = v => v !== undefined && v !== null && v !== "";
+  const cap = s => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+
+  let lang = "en"; try { const l = localStorage.getItem("flathunt-lang"); if (I18N[l]) lang = l; } catch (e) {}
+  if (I18N[location.hash.slice(1)]) lang = location.hash.slice(1);
+  let T = I18N[lang];
+  const tf = (c, f) => (c.i18n && c.i18n[lang] && c.i18n[lang][f] != null) ? c.i18n[lang][f] : c[f];
+  const nf = (n, d = 0) => new Intl.NumberFormat(T.locale, { maximumFractionDigits: d }).format(n);
+  const eur = n => n == null ? "–" : new Intl.NumberFormat(T.locale, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+  const eurSqm = n => n == null ? "–" : new Intl.NumberFormat(T.locale, { style: "currency", currency: "EUR", minimumFractionDigits: n < 100 ? 2 : 0, maximumFractionDigits: n < 100 ? 2 : 0 }).format(n) + "/m²";
+  const sqm = n => n == null ? "–" : nf(n, 1) + " m²";
+  const pct = s => new Intl.NumberFormat(T.locale, { style: "percent", maximumFractionDigits: 0 }).format(s);
+  const fmtDate = iso => { if (!iso) return ""; const d = new Date(iso); if (isNaN(d)) return iso; return d.toLocaleDateString(T.locale, { day: "2-digit", month: "2-digit", year: "numeric" }) + (iso.length > 10 ? " " + d.toLocaleTimeString(T.locale, { hour: "2-digit", minute: "2-digit" }) : ""); };
+  const scoreColor = s => s == null ? "var(--muted)" : s >= 70 ? "var(--good)" : s >= 55 ? "var(--warn)" : "var(--bad)";
+  const scoreHex = s => s == null ? "#8a97a8" : s >= 70 ? "#1d7a4b" : s >= 55 ? "#c07d13" : "#b4393b";
+
+  // ---------- listing helpers ----------
+  const modesOn = () => ["rent", "buy"].filter(m => P.modes[m]);
+  const bothModes = () => P.modes.rent && P.modes.buy;
+  const isOut = c => c.gone || ["rejected", "dropped", "gone"].includes(c.status);
+  const warmOf = c => Money.warmRent(c);
+  // Headline amount: purchase price, else warm rent, else cold rent.
+  const headPrice = c => c.mode === "buy" ? (known(c.price) ? c.price : null) : (warmOf(c) ?? (known(c.coldRent) ? c.coldRent : null));
+  // Monthly housing cost used for affordability: warm rent, or the loan payment when buying.
+  const monthlyOf = c => c.mode === "buy" ? (known(c.price) ? Money.buyMonthly(c.price, P).monthly : null) : warmOf(c);
+  // Commute arrays can be longer than the current places (a place was removed and the times not yet recalculated).
+  const placeMin = (c, i) => { if (!P || i >= (P.places || []).length) return null; const x = (c.commute || [])[i]; return x && known(x.minutes) ? x.minutes : null; };
+  const firstMin = c => placeMin(c, 0);
+  const titleOf = c => tf(c, "title") || c.title || c.id;
+  const addressLine = c => { const town = [c.postcode, c.city].filter(Boolean).join(" "); const a = String(c.address || ""); return [a, town && !a.includes(c.city || "\u0000") ? town : "", c.district].filter(Boolean).join(" · "); };
+  // Amount compared with the limits: purchase price, or warm rent (cold rent alone is not compared with the warm-rent limit).
+  const limPrice = c => c.mode === "buy" ? (known(c.price) ? c.price : null) : warmOf(c);
+  const priceCls = c => { const v = limPrice(c); if (v == null) return ""; const lim = c.mode === "buy" ? P.buy.maxPrice : P.rent.maxWarm; return v <= lim ? "good" : v <= lim * 1.1 ? "warn" : "bad"; };
+
+  let listings = [], raw = {}, meta = { lastCheck: null, log: [] };
+  const expanded = new Set(); if (location.hash.startsWith("#listing-")) expanded.add(location.hash.slice(9));
+  const openPhoto = {}, openReply = {};
+  let DEF = {}, F = {};
+  function defaults() {
+    const top = (v, step) => Math.max(step, Math.ceil(v * 1.5 / step) * step);
+    return { statuses: new Set(), query: "", savedOnly: false, mode: "all", maxWarm: top(P.rent.maxWarm, 50), maxPrice: top(P.buy.maxPrice, 10000), minRooms: 0, minSize: 0, inCriteria: true, hideOut: true, sort: "rec" };
+  }
+  function initFilters() {
+    DEF = defaults(); F = { ...DEF, statuses: new Set() };
+    try { const s = JSON.parse(localStorage.getItem("flathunt-filters") || "null"); if (s) F = { ...F, ...s, statuses: new Set((s.statuses || []).filter(x => STATUSES.includes(x))) }; } catch (e) {}
+    if (F.maxWarm > DEF.maxWarm) F.maxWarm = DEF.maxWarm; if (F.maxPrice > DEF.maxPrice) F.maxPrice = DEF.maxPrice;
+  }
+  const saveF = () => { try { localStorage.setItem("flathunt-filters", JSON.stringify({ ...F, statuses: [...F.statuses] })); } catch (e) {} };
+  let lastVisit = null; try { lastVisit = localStorage.getItem("flathunt-lastvisit"); } catch (e) {}
+  const isNew = c => lastVisit && c.addedAt && c.addedAt > lastVisit.slice(0, 10);
+  let tableSort = { k: "score", dir: -1 };
+  let filtersOpen = false, panelTab = "map", chartMode = null;
+
+  // ---------- criteria reasons ----------
+  function critText(r) {
+    const c = T.crit, f = P.flat;
+    switch (r.key) {
+      case "mode": return c.mode(T.mode[r.value] || r.value);
+      case "warm": return c.warm(eur(r.value), eur(P.rent.maxWarm));
+      case "cold": return c.cold(eur(r.value), eur(P.rent.maxCold));
+      case "deposit": return c.deposit(eur(r.value), eur(P.rent.maxDeposit));
+      case "takeover": return c.takeover(eur(r.value), eur(P.rent.maxTakeover));
+      case "price": return c.price(eur(r.value), eur(P.buy.maxPrice));
+      case "rooms": return c.rooms(nf(r.value, 1), T.range(nf(f.roomsMin, 1), f.roomsMax == null ? null : nf(f.roomsMax, 1)));
+      case "size": return c.size(sqm(r.value), T.range(sqm(f.sizeMin), f.sizeMax == null ? null : sqm(f.sizeMax)));
+      case "floor": return c.floor(cap(T.floor(r.value)), T.range(f.floorMin == null ? null : T.floor(f.floorMin), f.floorMax == null ? null : T.floor(f.floorMax)));
+      case "lift": return c.lift;
+      case "outdoor": return c.outdoor(T.outdoor[r.value] || r.value);
+      case "kitchen": return c.kitchen;
+      case "pets": return c.pets;
+      // An earlier date is outside the window too: the flat would stand empty (and be paid for) before you can move.
+      case "movein": return f.moveInFrom && r.value < f.moveInFrom ? c.moveinEarly(fmtDate(r.value), fmtDate(f.moveInFrom)) : c.moveinLate(fmtDate(r.value), fmtDate(f.moveInTo));
+      case "wbs": return c.wbs;
+      case "commute": { const p = P.places[r.value] || {}; return c.commute(p.label, nf(placeMin(r.listing || {}, r.value) ?? 0), p.maxMin); }
+      case "radius": return c.radius(nf(r.value, 1), nf(P.radius.km, 1));
+      case "flag": return (r.def.label && (r.def.label[lang] || r.def.label.en)) || r.value;
+    }
+    return String(r.key);
+  }
+  const flagLabel = d => (d.label && (d.label[lang] || d.label.en)) || d.id;
+  const flagReason = d => (d.reason && (d.reason[lang] || d.reason.en)) || "";
+
+  // ---------- filtering & sorting ----------
+  function matches(c, skipCriteria) {
+    if (F.query) { const hay = [titleOf(c), c.address, c.postcode, c.city, c.district, c.contact && c.contact.name].filter(Boolean).join(" ").toLocaleLowerCase(); if (!hay.includes(F.query.trim().toLocaleLowerCase())) return false; }
+    if (F.savedOnly && !c.pick) return false;
+    if (F.statuses.size && !F.statuses.has(c.status)) return false;
+    if (bothModes() && F.mode !== "all" && c.mode !== F.mode) return false;
+    const hp = limPrice(c);
+    if (c.mode === "rent" && hp != null && F.maxWarm < DEF.maxWarm && hp > F.maxWarm) return false;
+    if (c.mode === "buy" && hp != null && F.maxPrice < DEF.maxPrice && hp > F.maxPrice) return false;
+    if (F.minRooms && known(c.rooms) && c.rooms < F.minRooms) return false;
+    if (F.minSize && known(c.size) && c.size < F.minSize) return false;
+    if (F.hideOut && isOut(c)) return false;
+    if (!skipCriteria && F.inCriteria && c._crit.length && c.status !== "accepted") return false;
+    return true;
+  }
+  const NONE = Number.POSITIVE_INFINITY;
+  function sortListings(list) {
+    const c = [...list], k = F.sort;
+    // Recommendation: accepted on top, then listings within the criteria by score, then outside the criteria, then rejected/dropped/gone.
+    const tier = c => c.status === "accepted" ? 0 : isOut(c) ? 3 : c._crit.length ? 2 : 1;
+    const rec = (a, b) => (tier(a) - tier(b)) || ((b.score ?? -1) - (a.score ?? -1)) || ((firstMin(a) ?? NONE) - (firstMin(b) ?? NONE)) || ((STATUS_RANK[a.status] ?? 5) - (STATUS_RANK[b.status] ?? 5)) || String(b.addedAt || "").localeCompare(String(a.addedAt || ""));
+    const asc = f => (a, b) => (f(a) ?? NONE) - (f(b) ?? NONE);
+    if (k === "score") c.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+    else if (k === "price") c.sort((a, b) => (a.mode === b.mode ? 0 : a.mode === "rent" ? -1 : 1) || asc(limPrice)(a, b));
+    else if (k === "ppsqm") c.sort((a, b) => (a.mode === b.mode ? 0 : a.mode === "rent" ? -1 : 1) || asc(Criteria.pricePerSqm)(a, b));
+    else if (k === "size") c.sort((a, b) => (b.size ?? -1) - (a.size ?? -1));
+    else if (k === "commute" && (P.places || []).length) c.sort(asc(firstMin));
+    else if (k === "newest") c.sort((a, b) => String(b.addedAt || "").localeCompare(String(a.addedAt || "")));
+    else c.sort(rec);
+    return c;
+  }
+  const visible = () => sortListings(listings.filter(matches));
+
+  // ---------- costs panel (selection and reserve stored only in this browser) ----------
+  let costSelected = [], reserveSqm = 1;
+  try { const x = JSON.parse(localStorage.getItem("flathunt-costs") || "null"); if (x) { costSelected = Array.isArray(x.selected) ? x.selected : []; if (Number.isFinite(x.reserveSqm)) reserveSqm = x.reserveSqm; } } catch (e) {}
+  const saveCosts = () => { try { localStorage.setItem("flathunt-costs", JSON.stringify({ selected: costSelected, reserveSqm })); } catch (e) {} };
+  // Monthly parts and one-off costs for one listing.
+  function costOf(c) {
+    if (c.mode === "buy") {
+      if (!known(c.price)) return { parts: [], total: null, oneOff: null, oneOffTxt: "" };
+      const pc = Money.purchaseCosts(c.price, P), bm = Money.buyMonthly(c.price, P), reserve = c.size > 0 ? c.size * reserveSqm : 0;
+      const equityUsed = Math.min(P.buy.equity, c.price + pc.total);
+      return { parts: [["loan", T.loanPart, bm.monthly], ["reserve", T.reservePart, reserve]], total: bm.monthly + reserve, oneOff: equityUsed, oneOffTxt: `${T.equity} ${eur(equityUsed)} (${T.ofWhichCosts} ${eur(Math.min(pc.total, equityUsed))})` + (equityUsed < pc.total ? `; ${T.costsFinanced} ${eur(pc.total - equityUsed)}` : "") };
+    }
+    const w = warmOf(c), o = rentOneOff(c);
+    return { parts: w == null ? [] : [["rent", T.rentPart, w]], total: w, oneOff: o.sum, oneOffUnknown: o.unknown, oneOffTxt: `${T.specs.deposit} ${known(c.deposit) ? eur(c.deposit) : T.unknown} + ${T.takeoverShort} ${known(c.takeover) ? eur(c.takeover) : T.unknown}` };
+  }
+  // Deposit + takeover; unknown parts are left out of the sum and flagged.
+  const rentOneOff = c => { const parts = [c.deposit, c.takeover]; const k = parts.filter(known); return { sum: k.length ? k.reduce((a, b) => a + b, 0) : null, unknown: k.length < parts.length }; };
+  const oneOffText = (sum, unknown) => sum == null ? T.unknown : eur(sum) + (unknown ? " " + T.plusUnknown : "");
+  const limitMonthly = () => P.money.netIncome ? P.money.netIncome * P.money.affordShare : null;
+  function renderCosts(list) {
+    const host = $("#costs"); host.innerHTML = "";
+    host.append(el("h2", null, T.costTitle), el("p", "intro", T.costIntro));
+    if (P.modes.buy) {
+      const inputs = el("div", "cost-inputs"), l = el("label", null, T.reserve), input = el("input");
+      input.type = "number"; input.min = 0; input.max = 10; input.step = 0.1; input.value = reserveSqm; input.setAttribute("aria-label", T.reserve);
+      input.onchange = () => { const n = Number(input.value); if (Number.isFinite(n)) reserveSqm = Math.min(10, Math.max(0, n)); saveCosts(); render(); };
+      l.append(input); inputs.append(l); host.append(inputs);
+    }
+    host.append(el("strong", null, T.costPick)); const picks = el("div", "cost-picks");
+    const choices = [...new Map([...list.slice(0, 12), ...costSelected.map(id => listings.find(c => c.id === id)).filter(Boolean)].map(c => [c.id, c])).values()];
+    choices.forEach(c => { const b = el("button", null, titleOf(c)); b.type = "button"; b.setAttribute("aria-pressed", costSelected.includes(c.id)); b.disabled = costSelected.length >= 6 && !costSelected.includes(c.id); b.onclick = () => { if (costSelected.includes(c.id)) costSelected = costSelected.filter(x => x !== c.id); else if (costSelected.length < 6) costSelected.push(c.id); saveCosts(); render(); }; picks.append(b); });
+    host.append(picks);
+    const rows = costSelected.map(id => listings.find(c => c.id === id)).filter(c => c && !isOut(c)).map(c => ({ c, ...costOf(c) }));
+    if (!rows.length) { host.append(el("p", "cost-note", T.costEmpty)); return; }
+    const limit = limitMonthly();
+    const max = Math.max(...rows.map(r => r.total || 0), limit ? limit * 1.1 : 0, 1), wrap = el("div", "cost-rows");
+    rows.forEach(r => {
+      const row = el("div", "cost-row"), name = el("div"); name.append(el("strong", null, titleOf(r.c)), el("small", null, T.mode[r.c.mode] || ""));
+      const bar = el("div", "cost-bar"); bar.setAttribute("role", "img"); bar.setAttribute("aria-label", `${titleOf(r.c)}: ` + r.parts.map(([, label, v]) => `${label} ${eur(Math.round(v))}`).join(", "));
+      r.parts.forEach(([cls, , value]) => { const part = el("span", cls); part.style.width = (value / max * 100) + "%"; bar.append(part); });
+      const graph = el("div", "cost-graph"), barwrap = el("div", "cost-barwrap"); barwrap.append(bar);
+      if (limit) { const ln = el("span", "cost-limit"); ln.style.left = (limit / max * 100) + "%"; barwrap.append(ln); }
+      graph.append(barwrap, el("div", "cost-detail", [...r.parts.map(([, label, v]) => `${label} ${eur(Math.round(v))}`), `${T.oneOff}: ${r.oneOffTxt}`].join(" · ")));
+      const total = el("div", "cost-total", r.total == null ? "–" : `${eur(Math.round(r.total))}${T.perMonth}`);
+      total.append(el("small", null, `${T.oneOff} ${oneOffText(r.oneOff, r.oneOffUnknown)}`), affordChip(r.c));
+      row.append(name, graph, total); wrap.append(row);
+    });
+    host.append(wrap);
+    const key = el("div", "cost-key");
+    const kinds = [...new Set(rows.flatMap(r => r.parts.map(p => p[0])))];
+    [["rent", T.rentPart], ["loan", T.loanPart], ["reserve", T.reservePart]].filter(([k]) => kinds.includes(k)).forEach(([cls, label]) => { const item = el("span"); item.append(el("i", cls), document.createTextNode(label)); key.append(item); });
+    if (limit) { const item = el("span"); item.append(el("i", "limit"), document.createTextNode(T.limitLine(eur(Math.round(limit)), pct(P.money.affordShare)))); key.append(item); }
+    host.append(key);
+    if (!limit) { const p = el("p", "cost-note"); const b = el("button", "linkish", T.noIncome); b.type = "button"; b.onclick = openSettings; p.append(b); host.append(p); }
+    host.append(el("p", "cost-note", T.costNote));
+  }
+
+  // ---------- header ----------
+  // ---------- About me (applicant profile and document vault, public/vault-ui.js) ----------
+  // Mounted when it opens, on a language change and when the page languages change; not on the 60-second refresh,
+  // so unsaved edits in the form survive.
+  let aboutOpen = false; try { aboutOpen = localStorage.getItem("flathunt-aboutme") === "1"; } catch (e) {}
+  let aboutMounted = "";
+  function syncAbout() {
+    const host = $("#aboutme"); host.hidden = !aboutOpen;
+    if (!aboutOpen) { aboutMounted = ""; host.replaceChildren(); return; }
+    const key = lang + "|" + ((P && P.languages) || []).join(",");
+    if (aboutMounted === key) return;
+    aboutMounted = key; VaultUI.mountAbout(host, { lang });
+  }
+  function toggleAbout() {
+    aboutOpen = !aboutOpen; try { localStorage.setItem("flathunt-aboutme", aboutOpen ? "1" : "0"); } catch (e) {}
+    renderHeader(); syncAbout();
+    if (aboutOpen) $("#aboutme").scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+  const openSettings = () => Setup.open({ mode: "settings", lang, onSaved: () => load() });
+  const addListing = () => Setup.addListing({ lang, onSaved: () => load() });
+  const scoreTxt = c => c.score == null ? "–" : (c.scoreEstimated ? "≈" : "") + c.score;
+  // The estimate tooltip also explains the area part (public/area-ui.js) once the area facts exist.
+  const estTitle = (node, c) => { if (c && c.scoreEstimated) node.title = T.estTip + (c.area ? "\n\n" + AreaUI.ratingTip(c, lang) : ""); return node; };
+  // First run: no listings yet. A welcome card replaces the panels that need data.
+  function renderWelcome() {
+    const host = $("#welcome"), empty = !listings.length; host.hidden = !empty; host.innerHTML = "";
+    ["kpis", "decision", "updates", "listings", "cards", "costs", "explore", "compare"].forEach(id => { const n = document.getElementById(id); if (empty) n.hidden = true; else if (id !== "updates") n.hidden = false; });
+    $(".tabs").hidden = empty;
+    if (!empty) return;
+    const b = el("button", "btn primary", T.head[0]); b.type = "button"; b.onclick = addListing;
+    const acts = el("div", "welcome-actions"); acts.append(b);
+    host.append(el("h2", null, T.welcomeTitle), el("p", null, T.welcomeText), acts);
+  }
+  function renderHeader() {
+    $("#apptitle").textContent = P.name; document.title = P.name;
+    document.querySelectorAll(".lang button").forEach(b => b.hidden = !P.languages.includes(b.dataset.lang));
+    document.documentElement.lang = T.locale;
+    const mt = bothModes() ? T.modesTxt.both : T.modesTxt[modesOn()[0]];
+    $("#sub").textContent = T.sub(listings.length, mt, meta.lastCheck ? fmtDate(meta.lastCheck) : null);
+    document.querySelectorAll(".lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === lang));
+    const n = listings.filter(isNew).length; const p = $("#newpill");
+    p.hidden = !n; p.textContent = T.newSince(n);
+    p.onclick = () => { lastVisit = new Date().toISOString(); try { localStorage.setItem("flathunt-lastvisit", lastVisit); } catch (e) {} render(); };
+    $("#addlisting").textContent = T.head[0]; $("#addlisting").onclick = addListing;
+    $("#settings").textContent = T.head[1]; $("#settings").onclick = openSettings;
+    const ab = $("#aboutbtn"); ab.textContent = T.head[2]; ab.setAttribute("aria-pressed", aboutOpen); ab.onclick = () => toggleAbout();
+    $("#maptitle").textContent = T.map; $("#listtitle").textContent = T.list; $("#cmptitle").textContent = T.cmp; $("#howto").textContent = T.howto; AreaUI.footer($("#sources"), lang);
+    // Jump links only for sections that currently have content.
+    const any = listings.length > 0;
+    const has = { aboutme: aboutOpen, decision: any, listings: any, costs: any, explore: any, compare: costSelected.some(id => listings.some(c => c.id === id)) };
+    const nav = $("#jumpnav"); nav.innerHTML = ""; Object.keys(has).filter(id => has[id]).forEach(id => { const a = el("a", null, T.nav[id]); a.href = "#" + id; nav.append(a); }); nav.hidden = !nav.childElementCount;
+    // Phone bar: filter toggle with the number of active filters, and map/chart tabs.
+    const active = F.statuses.size + !!F.query + F.savedOnly + (bothModes() && F.mode !== "all") + (P.modes.rent && F.maxWarm < DEF.maxWarm) + (P.modes.buy && F.maxPrice < DEF.maxPrice) + !!F.minRooms + !!F.minSize + !F.inCriteria + !F.hideOut;
+    const fb = $("#fbtn"); fb.textContent = filtersOpen ? T.fClose : T.fBtn(active); fb.setAttribute("aria-pressed", filtersOpen); fb.onclick = () => { filtersOpen = !filtersOpen; document.body.classList.toggle("filters-open", filtersOpen); renderHeader(); };
+    document.querySelectorAll(".tabs button").forEach(b => { b.textContent = b.dataset.tab === "map" ? T.tabMap : T.tabChart; b.setAttribute("aria-selected", b.dataset.tab === panelTab); b.onclick = () => { panelTab = b.dataset.tab; $(".panels").dataset.tab = panelTab; renderHeader(); if (panelTab === "map" && map) setTimeout(() => map.invalidateSize(), 50); }; });
+    $(".panels").dataset.tab = panelTab;
+    const ld = $("#loading"); if (ld) ld.textContent = T.loading;
+  }
+
+  // ---------- commute out of date ----------
+  let recalcBusy = false, recalcError = false, recalcProgress = null;
+  function renderStale() {
+    const host = $("#stale"), stale = listings.some(c => c.commuteStale);
+    host.hidden = !stale; host.innerHTML = ""; if (!stale) return;
+    const txt = el("div"); txt.append(el("strong", null, T.staleTitle), el("span", null, " " + (recalcError ? T.recalcFail : T.staleText)));
+    const b = el("button", "btn", recalcBusy ? T.recalcing + (recalcProgress && recalcProgress.total ? ` ${recalcProgress.done}/${recalcProgress.total}` : "") : T.recalc); b.type = "button"; b.disabled = recalcBusy;
+    b.onclick = async () => {
+      recalcBusy = true; recalcError = false; recalcProgress = null; renderStale();
+      try {
+        const r = await fetch("/api/listings/recalc-commute", { method: "POST" });
+        if (r.status !== 202) throw new Error(r.status);
+        // The server works through the listings in the background; follow its status until it is done.
+        let st = await r.json();
+        while (st.running) {
+          await new Promise(res => setTimeout(res, 2000));
+          const s = await fetch("/api/commute/status", { cache: "no-store" });
+          if (!s.ok) throw new Error(s.status);
+          st = await s.json(); recalcProgress = st; renderStale();
+        }
+        recalcBusy = false; recalcProgress = null;
+        if (st.error) { recalcError = true; renderStale(); } else await load();
+      } catch (e) { recalcBusy = false; recalcProgress = null; recalcError = true; renderStale(); }
+    };
+    host.append(txt, b);
+  }
+
+  // ---------- filters ----------
+  function renderFilters() {
+    const a = $("#filters"); a.innerHTML = "";
+    const search = el("input"); search.type = "search"; search.value = F.query || ""; search.placeholder = T.search; search.setAttribute("aria-label", T.search); search.className = "fsearch";
+    search.oninput = () => { const start = search.selectionStart; F.query = search.value; saveF(); render(); const replacement = $("#filters input[type=search]"); replacement.focus(); replacement.setSelectionRange(start, start); }; a.append(search);
+    const toggles = (title, items) => { const box = el("div"); if (title) box.append(el("h3", null, title)); const tg = el("div", "toggles"); items.forEach(([k, l]) => { const lab = el("label"); const i = el("input"); i.type = "checkbox"; i.checked = !!F[k]; i.id = "t-" + k; i.onchange = () => { F[k] = i.checked; saveF(); render(); }; lab.append(i, document.createTextNode(l)); tg.append(lab); }); box.append(tg); a.append(box); };
+    toggles(null, [["savedOnly", T.savedOnly]]);
+    const s1 = el("div"); s1.append(el("h3", null, T.fStatus));
+    const cs = el("div", "chipset"); const counts = {}; listings.forEach(c => counts[c.status] = (counts[c.status] || 0) + 1);
+    STATUSES.filter(s => counts[s]).forEach(s => { const b = el("button", "chip"); b.type = "button"; b.setAttribute("aria-pressed", F.statuses.has(s)); const d = el("i", "dot"); d.style.color = statusColor(s); b.append(d, document.createTextNode(T.status[s] + " · " + counts[s])); b.onclick = () => { if (F.statuses.has(s)) F.statuses.delete(s); else F.statuses.add(s); saveF(); render(); }; cs.append(b); });
+    s1.append(cs); if (cs.childElementCount) a.append(s1);
+    if (bothModes()) {
+      const sm = el("div"); sm.append(el("h3", null, T.fMode)); const ms = el("div", "chipset");
+      [["all", T.fBoth], ["rent", T.mode.rent], ["buy", T.mode.buy]].forEach(([k, label]) => { const b = el("button", "chip", label); b.type = "button"; b.setAttribute("aria-pressed", F.mode === k); b.onclick = () => { F.mode = k; saveF(); render(); }; ms.append(b); });
+      sm.append(ms); a.append(sm);
+    }
+    const s2 = el("div"); s2.append(el("h3", null, T.fLimits));
+    const rng = (key, label, min, max, step, fmt) => { const w = el("div", "range"); const l = el("label"); l.htmlFor = "f-" + key; const sp = el("span", null, label), bv = el("b", null, fmt(F[key])); l.append(sp, bv); const i = el("input"); i.type = "range"; i.min = min; i.max = max; i.step = step; i.value = F[key]; i.id = "f-" + key; i.oninput = () => { F[key] = +i.value; bv.textContent = fmt(F[key]); }; i.onchange = () => { saveF(); render(); }; w.append(l, i); return w; };
+    if (P.modes.rent) s2.append(rng("maxWarm", T.maxWarm, 0, DEF.maxWarm, 50, v => v >= DEF.maxWarm ? T.any : eur(v)));
+    if (P.modes.buy) s2.append(rng("maxPrice", T.maxPrice, 0, DEF.maxPrice, 10000, v => v >= DEF.maxPrice ? T.any : eur(v)));
+    s2.append(rng("minRooms", T.minRooms, 0, 6, 0.5, v => v ? nf(v, 1) : T.any), rng("minSize", T.minSize, 0, 200, 5, v => v ? sqm(v) : T.any));
+    a.append(s2);
+    toggles(T.fShow, [["inCriteria", T.inCriteria], ["hideOut", T.hideOut]]);
+    const s4 = el("div"); s4.append(el("h3", null, T.fSort)); const sel = el("select"); sel.id = "sort"; sel.setAttribute("aria-label", T.fSort);
+    Object.entries(T.sortOpts).forEach(([k, v]) => { if (k === "commute" && !(P.places || []).length) return; const o = el("option", null, typeof v === "function" ? v(P.places[0].label) : v); o.value = k; o.selected = k === F.sort; sel.append(o); });
+    sel.onchange = () => { F.sort = sel.value; saveF(); render(); }; s4.append(sel); a.append(s4);
+    const r = el("button", "reset", T.reset); r.type = "button"; r.onclick = () => { F = { ...DEF, statuses: new Set() }; saveF(); render(); }; a.append(r);
+  }
+
+  // ---------- KPIs ----------
+  function renderKpis(list) {
+    const k = $("#kpis"); k.innerHTML = "";
+    const tile = (v, l, s, onclick) => { const t = el("button", "kpi"); t.type = "button"; t.append(el("div", "v", v), el("div", "l", l)); if (s) t.append(el("div", "s", s)); if (onclick) t.onclick = onclick; k.append(t); return t; };
+    tile(String(list.length), T.kpiMatch, T.tracked(listings.length));
+    const best = [...list].filter(c => c.score != null).sort((a, b) => b.score - a.score)[0];
+    if (best) estTitle(tile(scoreTxt(best), T.kpiBest, titleOf(best), () => openListing(best.id)), best);
+    modesOn().forEach(m => { const cheap = list.filter(c => c.mode === m && limPrice(c) != null).sort((a, b) => limPrice(a) - limPrice(b))[0]; if (cheap) tile(eur(limPrice(cheap)), m === "buy" ? T.kpiCheapBuy : T.kpiCheapRent, titleOf(cheap), () => openListing(cheap.id)); });
+    const big = list.filter(c => c.size > 0).sort((a, b) => b.size - a.size)[0];
+    if (big) tile(sqm(big.size), T.kpiLargest, titleOf(big), () => openListing(big.id));
+    const near = (P.places || []).length ? list.filter(c => firstMin(c) != null).sort((a, b) => firstMin(a) - firstMin(b))[0] : null;
+    if (near) tile(nf(firstMin(near)) + " " + T.min, T.kpiCommute(P.places[0].label), titleOf(near), () => openListing(near.id));
+  }
+
+  function renderDecision(list) {
+    const host = $("#decision"); host.innerHTML = "";
+    const head = el("div", "decision-head"); head.append(el("h2", null, T.focus), el("p", null, T.focusHint)); host.append(head);
+    const available = list.filter(c => !isOut(c));
+    const focus = [...available.filter(c => c.pick), ...available.filter(c => !c.pick)].slice(0, 4);
+    if (!focus.length) { host.append(el("p", "empty", T.noFocus)); return; }
+    const grid = el("div", "decision-grid"); focus.forEach(c => {
+      const item = el("button", "decision-item"); item.type = "button"; item.setAttribute("aria-label", T.details + ": " + titleOf(c));
+      const facts = [c.city || c.district, known(c.rooms) ? T.rooms(nf(c.rooms, 1)) : "", c.size ? sqm(c.size) : "", `${scoreTxt(c)} ${T.score}`].filter(Boolean).join(" · ");
+      item.append(el("strong", null, titleOf(c)), estTitle(el("small", null, facts), c));
+      const m = monthlyOf(c);
+      item.append(el("span", "money", c.mode === "buy" ? (known(c.price) ? `${eur(c.price)} · ${eur(Math.round(m))} ${T.loanMonth}` : T.noPrice) : (m != null ? `${eur(m)} ${T.warm}${T.perMonth}` : headPrice(c) != null ? `${eur(headPrice(c))} ${T.cold}` : T.noPrice)));
+      const step = c.nextStep || (tf(c, "questions") || [])[0]; if (step) item.append(el("small", null, step));
+      item.onclick = () => openListing(c.id); grid.append(item);
+    }); host.append(grid);
+  }
+
+  // ---------- map ----------
+  let map, markers, placeLayer, viewKey = "";
+  function renderMap(list) {
+    if (!window.L) return;
+    const vis = new Set(list.map(c => c.id)), places = P.places || [], r = P.radius || {};
+    const located = listings.filter(c => typeof c.lat === "number" && typeof c.lon === "number");
+    if (!map) {
+      map = L.map("map", { scrollWheelZoom: false }).setView([51.1657, 10.4515], 6);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors", maxZoom: 18 }).addTo(map);
+      placeLayer = L.layerGroup().addTo(map); markers = L.layerGroup().addTo(map);
+    }
+    // Places and radius are redrawn (and the view refitted) only when they, the language or the set of located listings change.
+    const key = JSON.stringify([lang, places.map(p => [p.lat, p.lon, p.label]), r, located.map(c => c.id)]);
+    if (key !== viewKey) {
+      viewKey = key; placeLayer.clearLayers();
+      const pts = located.map(c => [c.lat, c.lon]);
+      if (r.center && r.km) { const circle = L.circle([r.center.lat, r.center.lon], { radius: r.km * 1000, color: "#1f4e9a", weight: 1.5, dashArray: "5 5", fillOpacity: 0.04 }).addTo(placeLayer); circle.bindTooltip(`${T.radius}: ${nf(r.km, 1)} km`); const b = circle.getBounds(); pts.push([b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]); }
+      places.forEach((p, i) => {
+        L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "", html: `<div class="placepin" style="background:${PLACE_COLORS[i % 5]}">${i + 1}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }), zIndexOffset: 1000 })
+          .addTo(placeLayer).bindTooltip(esc(p.label), { permanent: true, direction: "right", offset: [12, 0], className: "placelabel" });
+        pts.push([p.lat, p.lon]);
+      });
+      if (pts.length > 1) map.fitBounds(pts, { padding: [28, 28], maxZoom: 13 }); else if (pts.length) map.setView(pts[0], 12);
+    }
+    markers.clearLayers();
+    located.forEach(c => {
+      const dim = !vis.has(c.id);
+      const m = L.marker([c.lat, c.lon], { icon: L.divIcon({ className: "", html: `<div class="listpin${dim ? " dim" : ""}" style="background:${scoreHex(c.score)}">${c.score ?? ""}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }), zIndexOffset: dim ? 0 : 500 });
+      const cm = places.map((p, i) => placeMin(c, i) == null ? `${p.label} ?` : `${p.label} ${placeMin(c, i)} ${T.min}`).join(" · ");
+      m.bindTooltip(`${esc(titleOf(c))}<br>${esc(limPrice(c) != null ? eur(limPrice(c)) : headPrice(c) != null ? eur(headPrice(c)) + " " + T.cold : T.noPrice)}${c.size ? " · " + esc(sqm(c.size)) : ""}${cm ? "<br>" + esc(cm) : ""}`);
+      m.on("click", () => openListing(c.id)); markers.addLayer(m);
+    });
+    const lg = $("#maplegend"); lg.innerHTML = `<span><i style="background:#1d7a4b"></i>${esc(T.scoreHigh)}</span><span><i style="background:#c07d13"></i>${esc(T.scoreMid)}</span><span><i style="background:#b4393b"></i>${esc(T.scoreLow)}</span>`;
+    places.forEach((p, i) => lg.insertAdjacentHTML("beforeend", `<span><i class="sq" style="background:${PLACE_COLORS[i % 5]}"></i>${i + 1} ${esc(p.label)}</span>`));
+    if (r.center && r.km) lg.insertAdjacentHTML("beforeend", `<span><i class="ring-i"></i>${esc(T.radius)} ${esc(nf(r.km, 1))} km</span>`);
+  }
+
+  // ---------- scatter: price or warm rent vs size ----------
+  const niceStep = raw => { const p = Math.pow(10, Math.floor(Math.log10(raw))); return [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= raw) || 10 * p; };
+  function renderChart(list) {
+    const modes = modesOn().filter(m => listings.some(c => c.mode === m));
+    if (bothModes() && F.mode !== "all" && modes.includes(F.mode)) chartMode = F.mode;
+    if (!modes.includes(chartMode)) chartMode = modes[0] || modesOn()[0];
+    $("#charttitle").textContent = T.chart(chartMode);
+    const cm = $("#chartmode"); cm.innerHTML = ""; cm.hidden = modes.length < 2;
+    if (modes.length > 1) modes.forEach(m => { const b = el("button", "chip", T.mode[m]); b.type = "button"; b.setAttribute("aria-pressed", chartMode === m); b.onclick = () => { chartMode = m; renderChart(visible()); }; cm.append(b); });
+    const vis = new Set(list.map(c => c.id));
+    const pts = listings.filter(c => c.mode === chartMode && c.size > 0 && limPrice(c) != null);
+    const ch = $("#chart");
+    if (!pts.length) { ch.innerHTML = ""; ch.append(el("p", "empty", T.noChart)); $("#chartlegend").innerHTML = ""; return; }
+    const W = 600, H = 360, PAD = { l: 64, r: 16, t: 14, b: 34 };
+    const limit = chartMode === "buy" ? P.buy.maxPrice : P.rent.maxWarm;
+    const xs = pts.map(c => c.size), ys = pts.map(limPrice);
+    const xStep = niceStep(Math.max(10, (Math.max(...xs) - Math.min(...xs)) / 5)), yStep = niceStep(Math.max(chartMode === "buy" ? 10000 : 50, (Math.max(...ys, limit) - Math.min(...ys)) / 5));
+    const x0 = Math.floor(Math.min(...xs) / xStep) * xStep, x1 = Math.max(x0 + xStep, Math.ceil(Math.max(...xs) / xStep) * xStep);
+    const y0 = Math.floor(Math.min(...ys) / yStep) * yStep, y1 = Math.max(y0 + yStep, Math.ceil(Math.max(...ys, limit * 1.05) / yStep) * yStep);
+    const X = v => PAD.l + (v - x0) / (x1 - x0) * (W - PAD.l - PAD.r), Y = v => H - PAD.b - (v - y0) / (y1 - y0) * (H - PAD.t - PAD.b);
+    const yLab = v => chartMode === "buy" ? nf(v / 1000) + "k €" : eur(v);
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(T.chart(chartMode))}">`;
+    for (let v = x0; v <= x1 + 1e-9; v += xStep) s += `<line class="grid" x1="${X(v)}" y1="${PAD.t}" x2="${X(v)}" y2="${H - PAD.b}"/><text x="${X(v)}" y="${H - 14}" text-anchor="middle">${esc(nf(v))} m²</text>`;
+    for (let v = y0; v <= y1 + 1e-9; v += yStep) s += `<line class="grid" x1="${PAD.l}" y1="${Y(v)}" x2="${W - PAD.r}" y2="${Y(v)}"/><text x="${PAD.l - 6}" y="${Y(v) + 4}" text-anchor="end">${esc(yLab(v))}</text>`;
+    const limLabel = chartMode === "buy" ? T.limitBuy : T.limitRent;
+    s += `<line class="budget" x1="${PAD.l}" y1="${Y(limit)}" x2="${W - PAD.r}" y2="${Y(limit)}"/><text x="${W - PAD.r}" y="${Y(limit) - 4}" text-anchor="end">${esc(limLabel)} ${esc(eur(limit))}</text>`;
+    sortListings(pts).reverse().forEach(c => { const dim = !vis.has(c.id); s += `<circle class="pt${dim ? " dim" : ""}" data-id="${esc(c.id)}" cx="${X(c.size)}" cy="${Y(limPrice(c))}" r="${dim ? 5 : 8}" fill="${scoreHex(c.score)}"><title>${esc(titleOf(c))} · ${esc(eur(limPrice(c)))} · ${esc(sqm(c.size))} · ${c.score ?? ""}</title></circle>`; });
+    s += "</svg>";
+    ch.innerHTML = s;
+    ch.querySelectorAll(".pt").forEach(p => p.onclick = () => openListing(p.dataset.id));
+    $("#chartlegend").innerHTML = `<span><i style="background:#1d7a4b"></i>${esc(T.scoreHigh)}</span><span><i style="background:#c07d13"></i>${esc(T.scoreMid)}</span><span><i style="background:#b4393b"></i>${esc(T.scoreLow)}</span><span>— — ${esc(limLabel)}</span>`;
+  }
+
+  // ---------- updates ----------
+  function renderUpdates() {
+    const u = $("#updates"); const log = (meta.log || []).slice(0, 8);
+    u.hidden = !log.length; if (!log.length) return;
+    u.innerHTML = ""; u.append(el("h3", null, T.updates)); const ul = el("ul");
+    log.forEach(e => { const li = el("li"); const up = OutreachUI.updateParts(e, lang); const tag = el("span", "tag " + e.type, up ? up.label : { new: T.upNew, price: T.upPrice, gone: T.upGone, back: T.upBack }[e.type] || e.type); const a = el("a", null, e.text || e.id); a.href = "#listing-" + e.id; a.onclick = ev => { ev.preventDefault(); openListing(e.id); }; li.append(el("span", "d", fmtDate(e.date)), tag, a); if (e.type === "price") li.append(el("span", "muted", eur(e.from) + " → " + eur(e.to) + (e.field === "coldRent" ? " " + T.cold : ""))); if (up && up.note) li.append(el("span", "muted", up.note)); if (e.type === "new" && e.price != null) li.append(el("span", "muted", eur(e.price))); ul.append(li); });
+    u.append(ul);
+  }
+
+  // ---------- list ----------
+  function openListing(id) { expanded.add(id); const c = listings.find(x => x.id === id); if (c && !matches(c)) { F = { ...DEF, statuses: new Set(), hideOut: false, inCriteria: false }; saveF(); } render(); const t = document.getElementById("listing-" + id); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  function ring(c) {
+    const score = c.score, r = 24, C = 2 * Math.PI * r, s = score ?? 0; const w = el("div", "ring" + (c.scoreEstimated ? " est" : ""));
+    w.innerHTML = `<svg viewBox="0 0 56 56"><circle class="bg" cx="28" cy="28" r="${r}"/><circle class="fg" cx="28" cy="28" r="${r}" stroke="${scoreColor(score)}" stroke-dasharray="${C * s / 100} ${C}"/></svg><div class="n" style="color:${scoreColor(score)}">${esc(scoreTxt(c))}</div>`;
+    return estTitle(w, c);
+  }
+  function commuteChips(c) {
+    const box = el("div", "facts commutes");
+    (P.places || []).forEach((p, i) => {
+      const m = placeMin(c, i);
+      const s = el("span", "fact " + (m == null ? "unk" : m > p.maxMin ? "bad" : ""), m == null ? T.commuteUnknown(p.label) : T.commuteChip(p.label, nf(m), T.placeMode[p.mode] || p.mode));
+      s.title = m == null ? T.commuteUnknownTip : m > p.maxMin ? T.overLimit(p.maxMin) : T.withinLimit(p.maxMin);
+      if (c.commuteStale) { s.classList.add("stale"); s.title += " · " + T.staleTitle; }
+      box.append(s);
+    });
+    return box;
+  }
+  // Affordability from Money.affordability; without an income it links to Settings.
+  function affordChip(c) {
+    const a = c._afford;
+    if (a.level === "unknown") {
+      if (monthlyOf(c) == null) return el("span", "fact unk", T.afford.unknown);
+      const b = el("button", "fact unk linkish", `${T.afford.unknown} · ${T.setIncome}`); b.type = "button"; b.title = T.setIncomeTip; b.onclick = e => { e.stopPropagation(); openSettings(); }; return b;
+    }
+    const s = el("span", "fact " + { fits: "good", tight: "warn", "too-much": "bad" }[a.level], `${T.afford[a.level]} · ${pct(a.share)} ${T.ofIncome}`);
+    s.title = `${eur(Math.round(monthlyOf(c)))}${T.perMonth} · ${T.limitLine(eur(Math.round(limitMonthly())), pct(P.money.affordShare))}`;
+    return s;
+  }
+  function card(c) {
+    const out = isOut(c);
+    const art = el("article", "card" + (out ? " is-out" : "") + (expanded.has(c.id) ? " open" : "")); art.id = "listing-" + c.id;
+    const row = el("div", "row"); row.setAttribute("role", "button"); row.tabIndex = 0; row.setAttribute("aria-expanded", expanded.has(c.id));
+    const tw = el("div", "thumbwrap"); tw.append(photo((c.photos || [])[0], "thumb", ""));
+    if (isNew(c)) tw.append(el("span", "tag new badge-new", T.newBadge)); row.append(tw);
+    const mid = el("div", "rowmain");
+    const h = el("h2", null, titleOf(c));
+    if (bothModes()) h.append(el("span", "ctype", T.mode[c.mode] || c.mode));
+    if (c.contact && T.contactType[c.contact.type]) h.append(el("span", "ctype" + (c.contact.type === "private" ? " p" : ""), T.contactType[c.contact.type]));
+    if (c.gone) h.append(el("span", "tag gone", T.gone));
+    if (c._crit.length) { const t = el("span", "tag out", T.outside); t.title = c._crit.map(r => critText({ ...r, listing: c })).join(" · "); h.append(t); }
+    if (c._flags.length) { const t = el("span", "tag flag", "⚠ " + T.redFlag(c._flags.length)); t.title = c._flags.map(d => flagLabel(d) + (flagReason(d) ? ": " + flagReason(d) : "")).join("\n"); h.append(t); }
+    const l2 = el("div", "line2", addressLine(c));
+    const facts = el("div", "facts");
+    if (c.mode === "buy") facts.append(el("span", "fact price " + priceCls(c), known(c.price) ? eur(c.price) : T.noPrice));
+    else {
+      const w = warmOf(c);
+      facts.append(el("span", "fact price " + priceCls(c), w != null ? `${eur(w)} ${T.warm}` : known(c.coldRent) ? `${eur(c.coldRent)} ${T.cold}` : T.noPrice));
+      if (w != null && known(c.coldRent)) facts.append(el("span", "fact", `${eur(c.coldRent)} ${T.cold}`));
+    }
+    if (OutreachUI.hasPendingProposal(c)) { const vb = el("span", "fact warn", OutreachUI.L[lang].viewingBadge); facts.append(vb); }
+    if (known(c.rooms)) facts.append(el("span", "fact", T.rooms(nf(c.rooms, 1))));
+    if (c.size) facts.append(el("span", "fact", sqm(c.size)));
+    const pps = Criteria.pricePerSqm(c); if (pps != null) facts.append(el("span", "fact", eurSqm(pps)));
+    if (known(c.floor)) facts.append(el("span", "fact", T.floor(c.floor)));
+    if (c.availableFrom) facts.append(el("span", "fact", c.availableFrom <= new Date().toISOString().slice(0, 10) ? T.now : T.from(fmtDate(c.availableFrom))));
+    const extra = el("div", "facts"); extra.append(affordChip(c), ...AreaUI.badges(c, { lang, queued: areaQueued.has(c.id) }));
+    mid.append(h, l2, facts, commuteChips(c), extra); row.append(mid);
+    const side = el("div", "rowside"); side.append(ring(c));
+    side.append(el("span", "pill s-" + c.status, T.status[c.status] || c.status));
+    const pk = el("label", "pick" + (c.pick ? " on" : "")); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!c.pick; cb.id = "pick-" + c.id; pk.append(cb, el("span", null, c.pick ? T.shortlisted : T.shortlist));
+    pk.onclick = e => e.stopPropagation(); cb.onchange = () => save(c.id, { pick: cb.checked });
+    const compare = el("button", "compare-toggle", costSelected.includes(c.id) ? T.comparing : T.compare); compare.type = "button"; compare.setAttribute("aria-pressed", costSelected.includes(c.id)); compare.disabled = costSelected.length >= 6 && !costSelected.includes(c.id); compare.onclick = e => { e.stopPropagation(); if (costSelected.includes(c.id)) costSelected = costSelected.filter(x => x !== c.id); else costSelected.push(c.id); saveCosts(); render(); };
+    side.append(pk, compare); row.append(side);
+    const toggle = () => { if (expanded.has(c.id)) expanded.delete(c.id); else expanded.add(c.id); art.classList.toggle("open", expanded.has(c.id)); row.setAttribute("aria-expanded", expanded.has(c.id)); const d = art.querySelector(".detail"); if (expanded.has(c.id) && !d) art.append(detail(c)); else if (!expanded.has(c.id) && d) d.remove(); };
+    row.onclick = toggle; row.onkeydown = e => { if (e.target === row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(); } };
+    art.append(row); if (expanded.has(c.id)) art.append(detail(c));
+    return art;
+  }
+  // Listing photo, or a neutral placeholder when there is none or it fails to load.
+  const HOUSE_SVG = '<svg viewBox="0 0 64 48" aria-hidden="true"><path d="M8 24 32 6l24 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/><path d="M14 20v22h36V20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><rect x="27" y="29" width="10" height="13" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="18" y="24" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/><rect x="39" y="24" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+  function placeholder(cls) { const d = el("div", cls + " ph"); d.innerHTML = HOUSE_SVG; return d; }
+  function photo(src, cls, alt) {
+    if (typeof src !== "string" || !src.trim()) return placeholder(cls);
+    const im = el("img", cls); im.src = src; im.alt = alt; im.loading = "lazy"; im.onerror = () => im.replaceWith(placeholder(cls)); return im;
+  }
+  const isHttp = v => typeof v === "string" && /^https?:\/\//i.test(v);
+  function specRow(dl, k, v) { if (v == null || v === "") return; const d = el("div"); d.append(el("dt", null, k), el("dd", null, String(v))); dl.append(d); }
+  const yn = v => v === true ? T.yes : v === false ? T.no : null;
+  function detail(c) {
+    const d = el("div", "detail");
+    const head = el("div", "dhead");
+    const ph = el("div", "photos"); const photos = c.photos || []; const idx = Math.min(openPhoto[c.id] || 0, Math.max(photos.length - 1, 0));
+    if (!photos.length) ph.append(placeholder("mainimg"));
+    else { const main = el("img", "mainimg"); main.src = photos[idx]; main.alt = titleOf(c); ph.append(main);
+      if (photos.length > 1) { const th = el("div", "thumbs"); photos.forEach((p, i) => { const im = el("img", i === idx ? "on" : ""); im.src = p; im.alt = ""; im.onclick = () => { openPhoto[c.id] = i; main.src = p; th.querySelectorAll("img").forEach(x => x.classList.toggle("on", x === im)); }; th.append(im); }); ph.append(th); } }
+    head.append(ph);
+    const f = el("div", "dfacts");
+    // Commute per place, with mode and limit.
+    if ((P.places || []).length) {
+      const box = el("div"); box.append(el("h3", null, T.commuteH));
+      const tbl = el("table", "ctable"); const hr = el("tr"); T.commuteCols.forEach((h, i) => hr.append(el("th", i >= 2 ? "num" : null, h))); const th = el("thead"); th.append(hr); tbl.append(th); const tb = el("tbody");
+      P.places.forEach((p, i) => { const m = placeMin(c, i), x = (c.commute || [])[i]; const tr = el("tr"); const name = el("td"); const dot = el("i", "sq"); dot.style.background = PLACE_COLORS[i % 5]; name.append(dot, document.createTextNode(p.label)); tr.append(name, el("td", null, T.placeMode[p.mode] || p.mode));
+        const tm = el("td", "num " + (m == null ? "unk" : m > p.maxMin ? "bad" : "good"), m == null ? "?" : `${nf(m)} ${T.min}`); tm.title = m == null ? T.commuteUnknownTip : x && x.checkedAt ? T.checked(fmtDate(x.checkedAt)) : ""; tr.append(tm, el("td", "num", `${p.maxMin} ${T.min}`)); tb.append(tr); });
+      tbl.append(tb); box.append(tbl);
+      if (c.commuteStale) box.append(el("p", "warnline", T.staleTitle));
+      box.append(el("p", "hint", T.commuteNote)); f.append(box);
+    }
+    const tr = el("div", "travel");
+    const t1 = el("div"); t1.append(el("b", null, c.city || c.district || "–"), document.createTextNode(addressLine(c))); tr.append(t1);
+    if (c.contact && (c.contact.name || c.contact.type)) { const t3 = el("div"); t3.append(el("b", null, c.contact.name || T.contactH), document.createTextNode(T.contactType[c.contact.type] || "")); tr.append(t3); }
+    f.append(tr);
+    const links = el("div", "links");
+    if (isHttp(c.url)) { const a = el("a", "primary", T.listing); a.href = c.url; a.target = "_blank"; a.rel = "noopener"; links.append(a); }
+    if (isHttp(c.mapsUrl)) { const m = el("a", null, T.mapLink); m.href = c.mapsUrl; m.target = "_blank"; m.rel = "noopener"; links.append(m); }
+    if (links.childElementCount) f.append(links);
+    head.append(f); d.append(head);
+
+    const body = el("div", "dbody");
+    const left = el("div", "col");
+    const crit = c._crit.filter(r => r.key !== "flag");
+    if (crit.length) { const box = el("div", "crit"); box.append(el("strong", null, T.outside)); const ul = el("ul"); crit.forEach(r => ul.append(el("li", null, critText({ ...r, listing: c })))); box.append(ul); left.append(box); }
+    if (c._flags.length) { const box = el("div", "crit flags"); box.append(el("strong", null, "⚠ " + T.flagsH)); const ul = el("ul"); c._flags.forEach(df => { const li = el("li"); li.append(el("b", null, flagLabel(df))); if (flagReason(df)) li.append(document.createTextNode(" — " + flagReason(df))); ul.append(li); }); box.append(ul); left.append(box); }
+    left.append(el("h3", null, T.facts));
+    const dl = el("dl", "specs"), S = T.specs, w = warmOf(c);
+    specRow(dl, S.mode, T.mode[c.mode]);
+    if (c.mode === "rent") { specRow(dl, S.warmRent, w != null ? eur(w) : null); specRow(dl, S.coldRent, known(c.coldRent) ? eur(c.coldRent) : null); specRow(dl, S.utilities, known(c.utilities) ? eur(c.utilities) : null); specRow(dl, S.deposit, known(c.deposit) ? eur(c.deposit) : null); specRow(dl, S.takeover, known(c.takeover) ? eur(c.takeover) : null); }
+    else specRow(dl, S.price, known(c.price) ? eur(c.price) : null);
+    const pps = Criteria.pricePerSqm(c); specRow(dl, S.ppsqm, pps != null ? eurSqm(pps) : null);
+    specRow(dl, S.rooms, known(c.rooms) ? nf(c.rooms, 1) : null); specRow(dl, S.size, c.size ? sqm(c.size) : null); specRow(dl, S.floor, known(c.floor) ? T.floor(c.floor) : null);
+    specRow(dl, S.lift, yn(c.lift)); specRow(dl, S.outdoor, c.outdoor ? T.outdoor[c.outdoor] || c.outdoor : null); specRow(dl, S.kitchen, yn(c.kitchen)); specRow(dl, S.pets, yn(c.petsAllowed));
+    specRow(dl, S.available, c.availableFrom ? fmtDate(c.availableFrom) : null); specRow(dl, S.wbs, yn(c.wbsRequired));
+    specRow(dl, S.address, [c.address, [c.postcode, c.city].filter(Boolean).join(" ")].filter(Boolean).join(", ")); specRow(dl, S.district, c.district); specRow(dl, S.source, c.source);
+    left.append(dl);
+    if ((c.priceHistory || []).length > 1) left.append(el("div", "pricehist", T.priceHist + ": " + c.priceHistory.map(p => fmtDate(p.date) + " " + eur(p.price)).join(" → ")));
+    // Costs: monthly and one-off; buying shows the purchase-cost breakdown.
+    left.append(el("h3", "sp", T.costsH));
+    const cdl = el("dl", "specs");
+    if (c.mode === "buy") {
+      if (known(c.price)) {
+        const pc = Money.purchaseCosts(c.price, P), bm = Money.buyMonthly(c.price, P), st = P.buy.state;
+        specRow(cdl, T.price, eur(c.price)); specRow(cdl, T.transferTax(st, nf(Money.TRANSFER_TAX[st] || 0, 1)), eur(pc.transferTax)); specRow(cdl, T.notary, eur(pc.notary)); specRow(cdl, T.agent(nf(P.buy.agentFeePct, 2)), eur(pc.agent));
+        specRow(cdl, T.purchaseCosts, eur(pc.total)); specRow(cdl, T.equity, eur(Math.min(P.buy.equity, c.price + pc.total))); specRow(cdl, T.loan, eur(bm.loan)); specRow(cdl, T.monthlyPay(nf(P.buy.apr, 2), P.buy.years), eur(Math.round(bm.monthly)));
+      }
+      left.append(cdl, el("p", "hint", T.taxNote(Money.TRANSFER_TAX_CHECKED)));
+    } else {
+      specRow(cdl, T.rentMonthly, w != null ? eur(w) + (known(c.coldRent) && known(c.utilities) ? " (" + T.coldPlus(eur(c.coldRent), eur(c.utilities)) + ")" : "") : null);
+      const o = rentOneOff(c); specRow(cdl, `${T.oneOff}: ${T.depositTakeover}`, oneOffText(o.sum, o.unknown));
+      left.append(cdl);
+    }
+    const af = el("div", "facts afford"); af.append(el("span", "muted", T.affordH + ": "), affordChip(c)); left.append(af);
+    // Area facts (public/area-ui.js): places, flood, noise, crime, census rent and the price check, each with its source.
+    const areaSec = el("section", "area"); AreaUI.panel(areaSec, c, { lang, listings, queued: areaQueued.has(c.id), onChanged: () => load() }); left.append(areaSec);
+    if (tf(c, "verdict") || (tf(c, "pros") || []).length || (tf(c, "cons") || []).length) {
+      left.append(el("h3", "sp", T.take), el("p", "verdict", tf(c, "verdict") || ""));
+      const pc = el("div", "pc"); const plus = el("ul", "plus"); (tf(c, "pros") || []).forEach(p => plus.append(el("li", null, p))); const minus = el("ul", "minus"); (tf(c, "cons") || []).forEach(p => minus.append(el("li", null, p))); pc.append(plus, minus); left.append(pc);
+    }
+    const rt = c.rating || (c.scoreEstimated ? Criteria.estimateRating(c, P) : null);
+    if (rt) { const bars = el("div", "bars"); RATING_KEYS.forEach(k => { const known_ = rt[k] != null; const blab = el("span", "bl", T.rating[k]); bars.append(blab); const bt = el("div", "bt"); if (k === "area" && c.scoreEstimated) { blab.title = bt.title = AreaUI.ratingTip(c, lang); blab.classList.add("tipped"); } if (known_) { const v = Math.max(0, Math.min(10, rt[k])); const bf = el("div", "bf"); bf.style.width = v * 10 + "%"; bf.style.background = v >= 7 ? "var(--good)" : v >= 5 ? "var(--warn)" : "var(--bad)"; bt.append(bf); } bars.append(bt, el("span", "bv", known_ ? rt[k] + "/10" : "?")); }); if (c.scoreEstimated) bars.title = T.estTip; left.append(bars); }
+    const qs = tf(c, "questions"); if (qs && qs.length) { const dq = el("details", "q"); dq.append(el("summary", null, T.questions + " (" + qs.length + ")")); const ol = el("ol"); qs.forEach(q => ol.append(el("li", null, q))); dq.append(ol); left.append(dq); }
+    body.append(left);
+    const right = el("div", "col"); right.append(el("h3", null, T.conv));
+    const tl = el("div", "timeline"); const msgs = [...(c.messages || [])].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    if (!msgs.length) tl.append(el("p", "empty", T.noMsgs));
+    msgs.forEach(m => { const g = m.i18n && m.i18n[lang]; const text = !g ? m.text : (m.dir === "in" ? m.text + "\n\n(" + g + ")" : g); const mm = el("div", "msg " + (m.dir === "in" ? "in" : "out")); const meta = el("div", "meta"); const who = el("span"); who.append(el("b", null, m.from || (m.dir === "out" ? OutreachUI.L[lang].me : "")), document.createTextNode(m.via ? " · " + m.via : "")); const mtag = OutreachUI.messageTag(m, lang); if (mtag) who.append(document.createTextNode(" "), el("span", "tag mtag" + (m.dir === "in" && m.intent === "rejection" ? " back" : ""), mtag)); meta.append(who, el("span", null, fmtDate(m.date))); mm.append(meta, el("div", "text", text)); tl.append(mm); });
+    right.append(tl);
+    const vw = el("section", "viewings"); OutreachUI.viewings(vw, c, { lang, onChanged: () => { expanded.add(c.id); return load(); } }); if (!vw.hidden) right.insertBefore(vw, tl);
+    const note = el("div", "saved");
+    const ctr = el("div", "controls"); const r2 = el("div", "row2");
+    const sW = el("div"); const sl = el("label", null, T.statusL); sl.htmlFor = "status-" + c.id; const ss = el("select"); ss.id = "status-" + c.id; STATUSES.forEach(k => { const o = el("option", null, T.status[k]); o.value = k; o.selected = k === c.status; ss.append(o); }); ss.onchange = () => save(c.id, { status: ss.value }, note); sW.append(sl, ss);
+    const nW = el("div"); const nl = el("label", null, T.next); nl.htmlFor = "next-" + c.id; const ni = el("input"); ni.id = "next-" + c.id; ni.value = c.nextStep || ""; ni.placeholder = T.nextPh; ni.onchange = () => save(c.id, { nextStep: ni.value }, note); nW.append(nl, ni);
+    r2.append(sW, nW); ctr.append(r2);
+    const noW = el("div"); const nol = el("label", null, T.notes); nol.htmlFor = "notes-" + c.id; const ta = el("textarea"); ta.id = "notes-" + c.id; ta.value = c.notes || ""; ta.placeholder = T.notesPh; ta.onchange = () => save(c.id, { notes: ta.value }, note); noW.append(nol, ta); ctr.append(noW);
+    const rb = el("button", "btn", openReply[c.id] ? T.cancel : T.logReply); rb.type = "button"; const form = el("div", "addreply" + (openReply[c.id] ? " open" : ""));
+    const fr = el("div", "row2"); const fW = el("div"); const fl = el("label", null, T.fromL); fl.htmlFor = "from-" + c.id; const fi = el("input"); fi.id = "from-" + c.id; fi.value = (c.contact && c.contact.name) || ""; fW.append(fl, fi);
+    const vW = el("div"); const vl = el("label", null, T.via); vl.htmlFor = "via-" + c.id; const vi = el("select"); vi.id = "via-" + c.id; T.vias.forEach(v => vi.append(el("option", null, v))); vW.append(vl, vi); fr.append(fW, vW);
+    const tW = el("div"); const txl = el("label", null, T.said); txl.htmlFor = "reply-" + c.id; const tx = el("textarea"); tx.id = "reply-" + c.id; tW.append(txl, tx);
+    const sb = el("button", "btn primary", T.add); sb.type = "button"; sb.onclick = () => { if (!tx.value.trim()) { tx.focus(); return; } const message = { date: new Date().toISOString(), dir: "in", from: fi.value || (c.contact && c.contact.name) || "", via: vi.value, text: tx.value.trim() }; openReply[c.id] = false; addMessage(c.id, message, note); };
+    form.append(fr, tW, sb); rb.onclick = () => { openReply[c.id] = !openReply[c.id]; form.classList.toggle("open", openReply[c.id]); rb.textContent = openReply[c.id] ? T.cancel : T.logReply; if (openReply[c.id]) tx.focus(); };
+    const acts = el("div", "lactions");
+    const eb = el("button", "btn", T.edit); eb.type = "button"; eb.onclick = () => Setup.editListing({ listing: c, lang, onSaved: () => { expanded.add(c.id); load(); } });
+    const db = el("button", "btn danger", T.del); db.type = "button"; db.onclick = () => removeListing(c, note);
+    acts.append(eb, db);
+    ctr.append(rb, form, note);
+    // Documents: requests and share links (public/vault-ui.js), between the conversation controls and Edit/Delete.
+    const docs = el("div", "docs"); VaultUI.listingDocs(docs, c, { lang, onChanged: () => load() });
+    right.append(ctr, docs, acts); body.append(right); d.append(body);
+    return d;
+  }
+  function renderList(list) {
+    const host = $("#cards"); host.innerHTML = "";
+    $("#count").textContent = T.count(list.length, listings.length);
+    // Listings that only the criteria filter (limits or red flags) hides, with a one-click way to show them.
+    if (F.inCriteria) {
+      const hiddenN = listings.filter(c => !matches(c) && matches(c, true)).length;
+      if (hiddenN) { const p = el("p", "hiddenline", T.hiddenBy(hiddenN) + " "); const b = el("button", "linkish", T.showThem); b.type = "button"; b.onclick = () => { F.inCriteria = false; saveF(); render(); }; p.append(b); host.append(p); }
+    }
+    if (!list.length) { host.append(el("p", "empty", T.noMatch)); return; }
+    list.forEach(c => host.append(card(c)));
+  }
+  function renderTable() {
+    const t = $("#cmp"); t.innerHTML = "";
+    const keys = ["title", "score", "mode", "price", "ppsqm", "rooms", "size", "floor", "available", "commute", "afford", "status"];
+    const val = (c, k) => k === "title" ? titleOf(c) : k === "mode" ? c.mode : k === "price" ? limPrice(c) : k === "ppsqm" ? Criteria.pricePerSqm(c) : k === "available" ? (c.availableFrom || "") : k === "commute" ? firstMin(c) : k === "afford" ? c._afford.share : k === "status" ? (STATUS_RANK[c.status] ?? 5) : c[k];
+    const rows = costSelected.map(id => listings.find(c => c.id === id)).filter(Boolean).sort((a, b) => { const x = val(a, tableSort.k), y = val(b, tableSort.k); if (x == null || y == null) return (x == null) - (y == null); return (typeof x === "string" ? x.localeCompare(y) : x - y) * tableSort.dir; });
+    const thead = el("thead"); const hr = el("tr"); const numCols = [1, 3, 4, 5, 6, 7, 9];
+    T.cols.forEach((h, i) => { if (i === 9 && !(P.places || []).length) return; const th = el("th", (numCols.includes(i) ? "num" : "") + (tableSort.k === keys[i] ? " sorted" : ""), h + (i === 9 ? " · " + P.places[0].label : "") + (tableSort.k === keys[i] ? (tableSort.dir > 0 ? " ↑" : " ↓") : "")); th.onclick = () => { if (tableSort.k === keys[i]) tableSort.dir *= -1; else tableSort = { k: keys[i], dir: keys[i] === "score" ? -1 : 1 }; renderTable(); }; hr.append(th); });
+    thead.append(hr); t.append(thead); const tb = el("tbody");
+    rows.forEach(c => { const tr = el("tr"); const td0 = el("td"); const a = el("a", null, titleOf(c)); a.href = "#listing-" + c.id; a.onclick = e => { e.preventDefault(); openListing(c.id); }; td0.append(a); if (c.pick) td0.append(document.createTextNode(" ✓")); tr.append(td0);
+      const ts = el("td", "num"); ts.append(estTitle(el("span", "sc", scoreTxt(c)), c)); ts.firstChild.style.color = scoreColor(c.score); tr.append(ts);
+      const pps = Criteria.pricePerSqm(c), fm = firstMin(c);
+      tr.append(el("td", null, T.mode[c.mode] || ""), el("td", "num " + priceCls(c), eur(limPrice(c))), el("td", "num", pps != null ? eurSqm(pps) : "–"), el("td", "num", known(c.rooms) ? nf(c.rooms, 1) : "–"), el("td", "num", c.size ? nf(c.size, 1) : "–"), el("td", "num", known(c.floor) ? String(c.floor) : "–"), el("td", null, c.availableFrom ? fmtDate(c.availableFrom) : "–"));
+      if ((P.places || []).length) tr.append(el("td", "num" + (fm != null && fm > P.places[0].maxMin ? " bad" : ""), fm == null ? "?" : `${nf(fm)} ${T.min}`));
+      const ta = el("td"); ta.append(affordChip(c)); tr.append(ta);
+      const tds = el("td"); tds.append(el("span", "pill s-" + c.status, T.status[c.status] || c.status)); tr.append(tds); tb.append(tr); });
+    t.append(tb);
+  }
+
+  function render() {
+    T = I18N[lang]; const list = visible(); renderHeader(); renderFilters(); renderWelcome(); renderStale(); syncAbout();
+    if (!listings.length) return;
+    renderKpis(list); renderDecision(list); renderMap(list); renderChart(list); renderUpdates(); renderCosts(list); renderList(list); renderTable();
+    $("#compare").hidden = !costSelected.some(id => listings.some(c => c.id === id));
+  }
+  document.querySelectorAll(".lang button").forEach(b => b.onclick = () => { lang = b.dataset.lang; try { localStorage.setItem("flathunt-lang", lang); } catch (e) {} if (P) { render(); sendSwitch(); } });
+
+  // ---------- saving ----------
+  let saving = Promise.resolve();
+  function send(id, method, path, body, noteEl) {
+    saving = saving.then(() => fetch("/api/listings/" + encodeURIComponent(id) + path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }))
+      .then(j => { raw[id] = j.listing; listings = toList(raw); render(); const n = noteEl && (document.querySelector(`#listing-${CSS.escape(id)} .saved`) || noteEl); if (n) { n.textContent = T.saved; setTimeout(() => n.textContent = "", 1500); } })
+      .catch(e => { if (noteEl) noteEl.textContent = T.saveFail; });
+  }
+  const save = (id, patch, noteEl) => send(id, "PATCH", "", patch, noteEl);
+  // Appended on the server, so messages the routine logged meanwhile are never overwritten by this page's copy.
+  const addMessage = (id, message, noteEl) => send(id, "POST", "/messages", message, noteEl);
+  function removeListing(c, noteEl) {
+    if (!confirm(T.confirmDelete(titleOf(c)))) return;
+    saving = saving.then(() => fetch("/api/listings/" + encodeURIComponent(c.id), { method: "DELETE" }).then(r => { if (!r.ok) throw new Error(r.status); }))
+      .then(() => {
+        expanded.delete(c.id); delete openReply[c.id]; delete openPhoto[c.id];
+        if (costSelected.includes(c.id)) { costSelected = costSelected.filter(x => x !== c.id); saveCosts(); }
+        if (location.hash === "#listing-" + c.id) history.replaceState(null, "", location.pathname + location.search);
+        return load();
+      })
+      .catch(e => { if (noteEl) noteEl.textContent = T.saveFail; });
+  }
+
+  // ---------- load ----------
+  // Score (or an estimate from the listing data), criteria check, red flags and affordability, recomputed for the whole set
+  // because the "far below similar listings" flag compares each listing with the others.
+  const toList = obj => {
+    const arr = Object.entries(obj || {}).map(([id, d]) => ({ id, ...d }));
+    arr.forEach(c => {
+      c.score = Criteria.scoreListing(c, P.weights); c.scoreEstimated = false;
+      if (c.score == null && !c.rating) { const e = Criteria.scoreListing({ rating: Criteria.estimateRating(c, P) }, P.weights); if (e != null) { c.score = e; c.scoreEstimated = true; } }
+      c._crit = Criteria.checkCriteria(c, P, CAT, arr);
+      const hit = c._crit.filter(r => r.key === "flag").map(r => r.def), ids = new Set(hit.map(d => d.id));
+      // Flags the routine stored on the listing count too, even when the text no longer matches.
+      (c.redFlags || []).forEach(id => { if (!ids.has(id)) { ids.add(id); hit.push(CAT.find(d => d.id === id) || { id, label: { en: id }, reason: {} }); } });
+      c._flags = hit;
+      c._afford = Money.affordability(monthlyOf(c), P);
+    });
+    return arr;
+  };
+  // ---------- area queue ----------
+  // Listings whose area facts are queued or being computed; polled every 10 s while any are, and the listings reloaded when one finishes.
+  let areaQueued = new Set(), areaPoll = null;
+  async function fetchAreaQueue() {
+    try { const r = await fetch("/api/area/queue", { cache: "no-store" }); if (!r.ok) return null; const j = await r.json(); return new Set([...(j.queued || []), j.running].filter(Boolean)); } catch (e) { return null; }
+  }
+  function setAreaQueue(s) {
+    if (s) areaQueued = s;
+    if (areaQueued.size && !areaPoll) areaPoll = setInterval(pollArea, 10000);
+    else if (!areaQueued.size && areaPoll) { clearInterval(areaPoll); areaPoll = null; }
+  }
+  async function pollArea() {
+    const s = await fetchAreaQueue(); if (!s) return;
+    const done = [...areaQueued].some(id => !s.has(id)), added = [...s].some(id => !areaQueued.has(id));
+    setAreaQueue(s);
+    if (done) await refresh(); else if (added && P) render();
+  }
+  async function load() {
+    try {
+      const rp = await fetch("/api/profile", { cache: "no-store" });
+      if (rp.status === 404) { document.body.classList.add("setup"); window.Setup && window.Setup.open({ mode: "wizard", lang, onSaved: () => location.reload() }); return; }
+      if (!rp.ok) throw new Error(rp.status);
+      P = await rp.json();
+      try { CAT = await (await fetch("redflags.json")).json(); } catch (e) { CAT = []; }
+      if (!P.languages.includes(lang)) { lang = P.languages[0]; T = I18N[lang]; }
+      initFilters();
+      const [r1, r2, q] = await Promise.all([fetch("/api/listings", { cache: "no-store" }), fetch("/api/meta", { cache: "no-store" }), fetchAreaQueue()]);
+      if (!r1.ok) throw new Error(r1.status);
+      setAreaQueue(q);
+      raw = (await r1.json()).listings || {}; listings = toList(raw); if (r2.ok) meta = await r2.json();
+      render(); sendSwitch();
+      if (location.hash.startsWith("#listing-")) { const t = document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView({ block: "start" }); }
+      if (!window.__flathuntRefresh) window.__flathuntRefresh = setInterval(refresh, 60000);
+    } catch (e) { console.warn(e); $("#cards").hidden = false; $("#cards").innerHTML = ""; $("#cards").append(el("p", "empty", T.loadFail)); }
+  }
+  // The header pause switch: status of the outreach routine; a 404 or an error hides it.
+  async function sendSwitch() {
+    const host = $("#sendsw");
+    try {
+      if (host.dataset.busy) return; // a pause request is in flight
+      const r = await fetch("/api/outreach/status", { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const status = await r.json();
+      if (host.dataset.busy) return;
+      OutreachUI.headerSwitch(host, { lang, status, onChanged: sendSwitch });
+    } catch (e) { host.hidden = true; }
+  }
+  async function refresh() {
+    sendSwitch();
+    if (document.activeElement && document.activeElement.closest(".controls, .docs, .viewings, aside.filters, dialog")) return;
+    try { const [r1, r2, q] = await Promise.all([fetch("/api/listings", { cache: "no-store" }), fetch("/api/meta", { cache: "no-store" }), fetchAreaQueue()]); setAreaQueue(q); if (r1.ok) { raw = (await r1.json()).listings || {}; listings = toList(raw); if (r2.ok) meta = await r2.json(); render(); } } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) sendSwitch(); });
+  load();
+  // setup.js reads the profile through window.FlatHunt.
+  window.FlatHunt = { profile: () => P, catalogue: () => CAT, lang: () => lang, reload: () => load() };
+  // Remember this visit for the "new since" badge, but only after the data arrived once.
+  setTimeout(() => { try { if (listings.length) localStorage.setItem("flathunt-lastvisit", lastVisit ? lastVisit : new Date().toISOString()); } catch (e) {} }, 4000);
+})();
+</script>
+</body>
+</html>
