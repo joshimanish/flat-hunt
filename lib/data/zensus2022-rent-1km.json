@@ -1,0 +1,17 @@
+{
+  "_source": "Statistische Ämter des Bundes und der Länder, Zensus 2022, Durchschnittliche Nettokaltmiete je m² (Gitter 1 km), https://www.destatis.de/static/DE/zensus/gitterdaten/Zensus2022_Durchschn_Nettokaltmiete.zip",
+  "_licence": "Datenlizenz Deutschland – Namensnennung – Version 2.0 (dl-de/by-2-0), https://www.govdata.de/dl-de/by-2-0",
+  "_attribution": "© Statistische Ämter des Bundes und der Länder, Zensus 2022, dl-de/by-2-0",
+  "_changes": "Converted by scripts/area-data.js into a dense grid of unsigned 16-bit little-endian values (euro cents per m², 0 = no value or suppressed), row by row from the south-west corner, gzip-compressed.",
+  "_generated": "2026-10-19",
+  "year": 2022,
+  "refDate": "2022-05-15",
+  "crs": "EPSG:3035",
+  "cellKm": 1,
+  "file": "zensus2022-rent-1km.u16.gz",
+  "x0": 4031,
+  "y0": 2691,
+  "width": 641,
+  "height": 857,
+  "cells": 136024
+}
